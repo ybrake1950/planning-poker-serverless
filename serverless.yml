@@ -1,3 +1,4 @@
+# serverless.yml - Fixed version with compatible plugins
 service: planning-poker-serverless
 
 provider:
@@ -6,10 +7,14 @@ provider:
   region: us-east-1
   stage: ${opt:stage, 'dev'}
   
+  # Environment variables
   environment:
     SESSIONS_TABLE: ${self:service}-sessions-${self:provider.stage}
     CONNECTIONS_TABLE: ${self:service}-connections-${self:provider.stage}
+    CORS_ORIGIN: ${env:CORS_ORIGIN, 'http://localhost:8080'}
+    NODE_ENV: ${self:provider.stage}
   
+  # IAM permissions for Lambda functions
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -20,64 +25,74 @@ provider:
         - dynamodb:UpdateItem
         - dynamodb:DeleteItem
       Resource:
-        - !GetAtt SessionsTable.Arn
-        - !GetAtt ConnectionsTable.Arn
-        - !Sub "${ConnectionsTable.Arn}/index/*"
+        - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.SESSIONS_TABLE}"
+        - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.CONNECTIONS_TABLE}"
+        - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.SESSIONS_TABLE}/index/*"
+        - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.CONNECTIONS_TABLE}/index/*"
+    - Effect: Allow
+      Action:
+        - execute-api:ManageConnections
+      Resource:
+        - "arn:aws:execute-api:*:*:**/@connections/*"
 
-# Cost-optimized Lambda functions (128MB memory for lowest cost)
+# Lambda Functions
 functions:
+  # WebSocket connection handlers
   websocketConnect:
     handler: serverless/websocket.connect
-    memorySize: 128
     events:
       - websocket: $connect
       
   websocketDisconnect:
-    handler: serverless/websocket.disconnect
-    memorySize: 128
+    handler: serverless/websocket.disconnect  
     events:
       - websocket: $disconnect
       
+  # Game logic handlers
   joinSession:
     handler: serverless/game.joinSession
-    memorySize: 128
     events:
       - websocket:
           route: joinSession
           
   castVote:
     handler: serverless/game.castVote
-    memorySize: 128
     events:
       - websocket:
           route: castVote
           
   resetVotes:
     handler: serverless/game.resetVotes
-    memorySize: 128
     events:
       - websocket:
           route: resetVotes
 
+  # HTTP API handlers  
   createSession:
     handler: serverless/api.createSession
-    memorySize: 128
     events:
       - http:
           path: /api/sessions
           method: post
           cors: true
           
+  getSession:
+    handler: serverless/api.getSession
+    events:
+      - http:
+          path: /api/sessions/{sessionCode}
+          method: get
+          cors: true
+          
   healthCheck:
     handler: serverless/api.healthCheck
-    memorySize: 128
     events:
       - http:
           path: /api/health
           method: get
           cors: true
 
-# Cost-optimized DynamoDB tables (pay-per-request + TTL auto-cleanup)
+# DynamoDB Tables
 resources:
   Resources:
     SessionsTable:
@@ -96,7 +111,7 @@ resources:
           Enabled: true
           
     ConnectionsTable:
-      Type: AWS::DynamoDB::Table
+      Type: AWS::DynamoDB::Table  
       Properties:
         TableName: ${self:provider.environment.CONNECTIONS_TABLE}
         AttributeDefinitions:
@@ -119,7 +134,13 @@ resources:
           AttributeName: expiresAt
           Enabled: true
 
+# Plugins - Using compatible versions
 plugins:
-  - serverless-webpack
   - serverless-offline
-  - serverless-dynamodb-local
+
+# Custom configuration
+custom:
+  serverless-offline:
+    httpPort: 3001
+    websocketPort: 3002
+    lambdaPort: 3003
