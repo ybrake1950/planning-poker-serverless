@@ -256,3 +256,70 @@ io.on('connection', (socket) => {
 
 // Export for testing
 module.exports = { app, server, io };
+// Add to your server/src/index.js file
+
+// Environment variable for team password
+const TEAM_PASSWORD = process.env.TEAM_PASSWORD || 'Prime2025'; // Set this in production
+
+// Add this middleware before your existing routes
+app.use('/api/sessions', (req, res, next) => {
+    // Skip password check for health endpoint
+    if (req.path === '/health') {
+        return next();
+    }
+    
+    const providedPassword = req.headers['x-team-password'] || req.body.password;
+    
+    if (!providedPassword || providedPassword !== TEAM_PASSWORD) {
+        return res.status(401).json({
+            error: 'Access denied',
+            message: 'Valid team password required'
+        });
+    }
+    
+    next();
+});
+
+// Modify your WebSocket connection to check password
+io.on('connection', (socket) => {
+    console.log('New client connected:', socket.id);
+    
+    // Require password for joining sessions
+    socket.on('joinSession', (data) => {
+        const { sessionCode, playerName, password, isSpectator } = data;
+        
+        // Check password for WebSocket connections
+        if (!password || password !== TEAM_PASSWORD) {
+            socket.emit('error', {
+                message: 'Invalid team password'
+            });
+            return;
+        }
+        
+        // Continue with existing joinSession logic...
+        updateSessionActivity(sessionCode);
+        
+        if (!sessions.has(sessionCode)) {
+            createSession(sessionCode);
+        }
+        
+        const session = sessions.get(sessionCode);
+        
+        // Add player to session
+        session.players.set(playerName, {
+            hasVoted: false,
+            vote: null,
+            isSpectator: Boolean(isSpectator),
+            socketId: socket.id
+        });
+        
+        socket.join(sessionCode);
+        
+        // Send session state to all players
+        io.to(sessionCode).emit('sessionUpdate', getSessionState(session));
+        
+        console.log(`Player ${playerName} joined session ${sessionCode}`);
+    });
+    
+    // Rest of your existing WebSocket handlers...
+});
