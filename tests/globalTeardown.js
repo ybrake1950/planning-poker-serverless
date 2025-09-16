@@ -1,6 +1,6 @@
-/ tests/globalTeardown.js  
+// tests/globalTeardown.js  
 // Global teardown that runs once after all tests
-// Directory: root project folder (planning-poker-serverless/)
+// Directory: planning-poker-serverless/tests/
 
 module.exports = async () => {
   console.log('🧹 Cleaning up test environment...');

@@ -1,6 +1,6 @@
 // tests/setup.js
 // Test setup configuration that runs before each test
-// Directory: root project folder (planning-poker-serverless/)
+// Directory: planning-poker-serverless/tests/
 
 // Set test environment variables
 process.env.NODE_ENV = "test";
@@ -52,5 +52,3 @@ afterEach(() => {
   // Clear all mocks
   jest.clearAllMocks();
 });
-
-// ===========================
