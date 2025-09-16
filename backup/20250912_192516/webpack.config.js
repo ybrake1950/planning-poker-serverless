@@ -1,24 +1,18 @@
 // client/webpack.config.js
-// Simplified Webpack configuration for Planning Poker client
+// Webpack configuration with Babel support for Planning Poker client
 
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const path = require('path');
 
-// Environment detection
-const isProduction = process.env.NODE_ENV === 'production';
-
 module.exports = {
-  // Mode configuration
-  mode: isProduction ? 'production' : 'development',
-  
-  // Entry point
+  // Entry point - main JavaScript file
   entry: './src/app.js',
   
   // Output configuration
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'bundle.js',
-    clean: true,
+    clean: true, // Clean dist folder before each build
     publicPath: '/'
   },
   
@@ -27,15 +21,16 @@ module.exports = {
     static: {
       directory: path.join(__dirname, 'dist'),
     },
-    port: 8080,
+    port: 8080, // Changed from 3000 to avoid conflict
     open: true,
     hot: true,
-    historyApiFallback: true,
+    historyApiFallback: true, // Support for client-side routing
+    // Allow connections from any host (needed for serverless dev)
     allowedHosts: 'all',
     headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-      'Access-Control-Allow-Headers': 'X-Requested-With, content-type, Authorization'
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+      "Access-Control-Allow-Headers": "X-Requested-With, content-type, Authorization"
     }
   },
   
@@ -44,39 +39,37 @@ module.exports = {
     new HtmlWebpackPlugin({
       template: './src/index.html',
       filename: 'index.html',
-      inject: true
+      inject: true // Inject bundle script into HTML
     })
   ],
   
   // Module rules for different file types
   module: {
     rules: [
-      // JavaScript files
       {
         test: /\.js$/,
         exclude: /node_modules/,
         use: {
           loader: 'babel-loader',
           options: {
-            presets: ['@babel/preset-env'],
-            plugins: []
+            presets: [
+              ['@babel/preset-env', {
+                targets: {
+                  browsers: ['> 1%', 'last 2 versions']
+                }
+              }]
+            ]
           }
         }
       },
-      
-      // CSS files
       {
         test: /\.css$/i,
         use: ['style-loader', 'css-loader']
       },
-      
-      // Image assets
       {
         test: /\.(png|svg|jpg|jpeg|gif)$/i,
         type: 'asset/resource'
       },
-      
-      // Font assets
       {
         test: /\.(woff|woff2|eot|ttf|otf)$/i,
         type: 'asset/resource'
@@ -91,5 +84,8 @@ module.exports = {
   },
   
   // Development tool for debugging
-  devtool: isProduction ? 'source-map' : 'eval-source-map'
+  devtool: 'eval-source-map',
+  
+  // Mode
+  mode: process.env.NODE_ENV === 'production' ? 'production' : 'development'
 };

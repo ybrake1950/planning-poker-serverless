@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planning Poker - Serverless Edition</title>
+    <title>Planning Poker - Agile Story Point Voting</title>
     <style>
-        /* Basic styling for the serverless version */
         * {
             margin: 0;
             padding: 0;
@@ -13,90 +12,103 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             color: #333;
         }
 
         .container {
-            background: white;
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            max-width: 800px;
-            width: 90%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
         }
 
         .header {
             text-align: center;
-            margin-bottom: 2rem;
+            margin-bottom: 30px;
         }
 
         .header h1 {
-            color: #5a67d8;
-            margin-bottom: 0.5rem;
+            color: white;
             font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
 
-        .subtitle {
-            color: #666;
+        .header p {
+            color: rgba(255,255,255,0.9);
             font-size: 1.1rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
         }
 
         /* Join Form Styles */
         .join-form {
-            margin-bottom: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-width: 400px;
+            margin: 0 auto;
         }
 
         .form-group {
-            margin-bottom: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
         .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
             font-weight: 600;
-            color: #4a5568;
+            color: #555;
         }
 
         .form-group input {
-            width: 100%;
-            padding: 0.75rem;
-            border: 2px solid #e2e8f0;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
             border-radius: 8px;
-            font-size: 1rem;
-            transition: border-color 0.2s;
+            font-size: 16px;
+            transition: border-color 0.3s;
         }
 
         .form-group input:focus {
             outline: none;
-            border-color: #5a67d8;
+            border-color: #667eea;
         }
 
         .btn {
-            background: #5a67d8;
-            color: white;
+            padding: 12px 24px;
             border: none;
-            padding: 0.75rem 1.5rem;
             border-radius: 8px;
-            font-size: 1rem;
+            font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: background-color 0.2s;
-            width: 100%;
+            transition: all 0.3s;
         }
 
-        .btn:hover {
-            background: #4c51bf;
+        .btn-primary {
+            background: #667eea;
+            color: white;
         }
 
-        .btn:disabled {
-            background: #a0aec0;
-            cursor: not-allowed;
+        .btn-primary:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
         }
 
         /* Game Interface Styles */
@@ -105,233 +117,262 @@
         }
 
         .session-info {
-            background: #f7fafc;
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1.5rem;
             text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            color: white;
         }
 
         .session-code {
             font-size: 1.5rem;
             font-weight: bold;
-            color: #5a67d8;
-            margin-bottom: 0.5rem;
+            margin-bottom: 10px;
         }
 
         .share-link {
-            color: #718096;
             font-size: 0.9rem;
+            word-break: break-all;
+            background: rgba(255,255,255,0.2);
+            padding: 10px;
+            border-radius: 5px;
             cursor: pointer;
-            text-decoration: underline;
         }
 
-        .players-section {
-            margin-bottom: 2rem;
+        .share-link:hover {
+            background: rgba(255,255,255,0.3);
         }
 
-        .players-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .player-card {
-            background: #f7fafc;
-            padding: 1rem;
-            border-radius: 8px;
+        /* Status Display */
+        .status {
             text-align: center;
-            border: 2px solid transparent;
-        }
-
-        .player-name {
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: #4a5568;
-        }
-
-        .player-name.spectator {
-            color: #805ad5;
-        }
-
-        .vote-card {
-            width: 60px;
-            height: 80px;
-            background: #667eea;
-            color: white;
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
             border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto;
-            font-size: 1.5rem;
+            border-left: 4px solid #667eea;
+        }
+
+        .consensus {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            color: white;
             font-weight: bold;
-            transition: all 0.3s ease;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            animation: pulse 2s infinite;
         }
 
-        .vote-card.hidden {
-            background: #a0aec0;
-        }
-
-        .vote-card.revealed {
-            background: #48bb78;
-            transform: rotateY(180deg);
-            animation: cardFlip 0.6s ease;
-        }
-
-        .vote-card.no-vote {
-            background: #e2e8f0;
-            color: #a0aec0;
-        }
-
-        @keyframes cardFlip {
-            0% { transform: rotateY(0deg); }
-            50% { transform: rotateY(90deg); }
-            100% { transform: rotateY(180deg); }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
         }
 
         /* Voting Cards */
         .voting-section {
-            margin-bottom: 2rem;
+            margin-bottom: 30px;
         }
 
-        .voting-cards {
+        .voting-section h3 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #555;
+        }
+
+        .fibonacci-cards {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
+            gap: 15px;
+            max-width: 600px;
+            margin: 0 auto;
         }
 
         .fibonacci-card {
-            width: 80px;
-            height: 120px;
+            aspect-ratio: 3/4;
             background: white;
-            border: 3px solid #e2e8f0;
+            border: 3px solid #e1e5e9;
             border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2rem;
+            font-size: 1.5rem;
             font-weight: bold;
-            color: #4a5568;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.3s;
             position: relative;
-            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        .fibonacci-card::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 12px;
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.3s;
         }
 
         .fibonacci-card:hover {
-            border-color: #5a67d8;
             transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(90, 103, 216, 0.2);
+            border-color: #667eea;
+        }
+
+        .fibonacci-card:hover::before {
+            opacity: 1;
         }
 
         .fibonacci-card.selected {
-            border-color: #5a67d8;
-            background: #5a67d8;
+            border-color: #667eea;
+            background: #667eea;
             color: white;
             transform: translateY(-5px);
+        }
+
+        .fibonacci-card.selected::before {
+            opacity: 1;
         }
 
         .fibonacci-card.disabled {
             opacity: 0.5;
             cursor: not-allowed;
-            pointer-events: none;
+            transform: none;
         }
 
-        /* Status and Controls */
-        .status {
+        .fibonacci-card.disabled:hover {
+            transform: none;
+            border-color: #e1e5e9;
+        }
+
+        /* Player Cards */
+        .players-section h3 {
             text-align: center;
-            margin-bottom: 1.5rem;
-            font-size: 1.1rem;
-            color: #4a5568;
+            margin-bottom: 20px;
+            color: #555;
         }
 
-        .consensus {
-            background: #48bb78;
-            color: white;
-            padding: 1rem;
+        .player-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .player-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .player-name {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .player-name.spectator {
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .vote-card {
+            width: 50px;
+            height: 70px;
+            background: white;
+            border: 2px solid #e1e5e9;
             border-radius: 8px;
-            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-size: 1.2rem;
             font-weight: bold;
-            animation: celebration 0.6s ease;
+            margin: 0 auto;
         }
 
-        @keyframes celebration {
-            0% { transform: scale(0.8); opacity: 0; }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); opacity: 1; }
+        .vote-card.revealed {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
         }
 
+        .vote-card.hidden {
+            background: #28a745;
+            color: white;
+            border-color: #28a745;
+        }
+
+        .vote-card.no-vote {
+            background: #f8f9fa;
+            color: #6c757d;
+        }
+
+        /* Spectator Controls */
         .spectator-controls {
             display: none;
-            text-align: center;
-            margin-top: 1.5rem;
-        }
-
-        .btn-secondary {
-            background: #ed8936;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            font-weight: 600;
-            cursor: pointer;
-            margin: 0 0.5rem;
-        }
-
-        .btn-secondary:hover {
-            background: #dd6b20;
+            justify-content: center;
+            margin-top: 20px;
         }
 
         /* Error and Loading States */
-        .error-message, .loading-state {
-            display: none;
-            text-align: center;
-            padding: 1rem;
-            margin: 1rem 0;
-            border-radius: 8px;
-        }
-
         .error-message {
-            background: #fed7d7;
-            color: #c53030;
-            border: 1px solid #feb2b2;
+            display: none;
+            background: #dc3545;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
         }
 
         .loading-state {
-            background: #bee3f8;
-            color: #2b6cb0;
-            border: 1px solid #90cdf4;
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: white;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         /* Mobile Responsive */
         @media (max-width: 768px) {
             .container {
-                padding: 1rem;
-                margin: 1rem;
+                padding: 10px;
             }
 
             .header h1 {
                 font-size: 2rem;
             }
 
-            .voting-cards {
+            .card {
+                padding: 20px;
+            }
+
+            .fibonacci-cards {
                 grid-template-columns: repeat(3, 1fr);
-                gap: 0.5rem;
             }
 
-            .fibonacci-card {
-                width: 70px;
-                height: 100px;
-                font-size: 1.5rem;
-            }
-
-            .players-grid {
-                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-                gap: 0.5rem;
+            .player-cards {
+                grid-template-columns: repeat(2, 1fr);
             }
         }
     </style>
@@ -341,7 +382,7 @@
         <!-- Header -->
         <div class="header">
             <h1>🃏 Planning Poker</h1>
-            <div class="subtitle">Serverless Agile Voting</div>
+            <p>Agile Story Point Estimation Tool</p>
         </div>
 
         <!-- Error Message -->
@@ -349,22 +390,32 @@
 
         <!-- Loading State -->
         <div id="loadingState" class="loading-state">
-            Connecting to server...
+            <div class="loading-spinner"></div>
+            <p>Connecting...</p>
         </div>
 
         <!-- Join Form -->
-        <div id="joinForm" class="join-form">
-            <div class="form-group">
-                <label for="playerName">Your Name</label>
-                <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
+        <div id="joinForm" class="card">
+            <div class="join-form">
+                <div class="form-group">
+                    <label for="playerName">Your Name</label>
+                    <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
+                </div>
+                
+                <div class="form-group">
+                    <label for="sessionCode">Session Code (optional)</label>
+                    <input type="text" id="sessionCode" placeholder="Leave empty to create new session" maxlength="8">
+                </div>
+                
+                <button class="btn btn-primary" id="joinButton">
+                    Join / Create Session
+                </button>
+                
+                <p style="text-align: center; color: #666; font-size: 0.9rem;">
+                    Leave session code empty to create a new session as the Spectator.<br>
+                    Enter a session code to join as a Voter.
+                </p>
             </div>
-            
-            <div class="form-group">
-                <label for="sessionCode">Session Code (optional - leave blank to create new)</label>
-                <input type="text" id="sessionCode" placeholder="Enter session code" maxlength="8">
-            </div>
-
-            <button class="btn" onclick="joinSession()">Join / Create Session</button>
         </div>
 
         <!-- Game Interface -->
@@ -374,41 +425,49 @@
                 <div class="session-code">
                     Session: <span id="currentSessionCode"></span>
                 </div>
-                <div class="share-link" id="shareLink" onclick="copyShareLink()">
-                    Click to copy share link
+                <div class="share-link" id="shareLink" title="Click to copy"></div>
+            </div>
+
+            <!-- Status -->
+            <div id="status" class="status">
+                Welcome! Waiting for players to join...
+            </div>
+
+            <!-- Voting Section -->
+            <div class="voting-section">
+                <div class="card">
+                    <h3>🎯 Cast Your Vote</h3>
+                    <div class="fibonacci-cards">
+                        <div class="fibonacci-card" data-value="1">1</div>
+                        <div class="fibonacci-card" data-value="2">2</div>
+                        <div class="fibonacci-card" data-value="3">3</div>
+                        <div class="fibonacci-card" data-value="5">5</div>
+                        <div class="fibonacci-card" data-value="8">8</div>
+                        <div class="fibonacci-card" data-value="13">13</div>
+                    </div>
                 </div>
             </div>
 
             <!-- Players Section -->
             <div class="players-section">
-                <h3>Players</h3>
-                <div id="playerCards" class="players-grid"></div>
-            </div>
-
-            <!-- Status -->
-            <div id="status" class="status">Ready to vote!</div>
-
-            <!-- Voting Section -->
-            <div class="voting-section">
-                <h3>Cast Your Vote</h3>
-                <div class="voting-cards">
-                    <div class="fibonacci-card" data-value="1" onclick="castVote(1)">1</div>
-                    <div class="fibonacci-card" data-value="2" onclick="castVote(2)">2</div>
-                    <div class="fibonacci-card" data-value="3" onclick="castVote(3)">3</div>
-                    <div class="fibonacci-card" data-value="5" onclick="castVote(5)">5</div>
-                    <div class="fibonacci-card" data-value="8" onclick="castVote(8)">8</div>
-                    <div class="fibonacci-card" data-value="13" onclick="castVote(13)">13</div>
+                <div class="card">
+                    <h3>👥 Players</h3>
+                    <div id="playerCards" class="player-cards">
+                        <!-- Player cards will be dynamically generated -->
+                    </div>
                 </div>
             </div>
 
             <!-- Spectator Controls -->
             <div id="spectatorControls" class="spectator-controls">
-                <button class="btn-secondary" onclick="resetVotes()">Reset Votes</button>
+                <button class="btn btn-secondary" id="resetButton">
+                    🔄 Reset Votes
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Socket.IO Client -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
+    <!-- Include Socket.IO from CDN -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </body>
 </html>

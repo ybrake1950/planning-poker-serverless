@@ -1,8 +1,10 @@
 // client/src/app.js
-// Frontend application for Planning Poker Serverless Edition
+// Fixed Frontend application logic for Planning Poker
+
+console.log('🚀 Planning Poker client starting...');
 
 // Application state
-var gameState = {
+let gameState = {
     socket: null,
     sessionCode: '',
     playerName: '',
@@ -17,90 +19,108 @@ var gameState = {
 
 // Initialize application when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Planning Poker Serverless - Starting up...');
+    console.log('📋 DOM loaded, setting up event listeners...');
+    setupEventListeners();
     initializeApp();
 });
 
+function setupEventListeners() {
+    console.log('🔗 Setting up event listeners...');
+    
+    // Join button
+    const joinButton = document.querySelector('#joinButton');
+    if (joinButton) {
+        joinButton.addEventListener('click', joinSession);
+        console.log('✅ Join button listener added');
+    }
+    
+    // Join form submission
+    const joinForm = document.querySelector('#joinForm');
+    if (joinForm) {
+        // Handle form submission with Enter key
+        const inputs = joinForm.querySelectorAll('input');
+        inputs.forEach(input => {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    joinSession();
+                }
+            });
+        });
+    }
+    
+    // Set up voting card clicks
+    document.querySelectorAll('.fibonacci-card').forEach(card => {
+        card.addEventListener('click', function() {
+            const value = parseInt(this.getAttribute('data-value'));
+            castVote(value);
+        });
+    });
+    
+    // Set up reset button
+    const resetButton = document.querySelector('#resetButton');
+    if (resetButton) {
+        resetButton.addEventListener('click', resetVotes);
+    }
+    
+    // Set up copy link functionality
+    const shareLink = document.querySelector('#shareLink');
+    if (shareLink) {
+        shareLink.addEventListener('click', copyShareLink);
+    }
+    
+    console.log('✅ Event listeners set up successfully');
+}
+
 function initializeApp() {
-    console.log('📋 Initializing application...');
+    console.log('🔧 Initializing Planning Poker app...');
     
     // Check for session code in URL
-    var urlParams = new URLSearchParams(window.location.search);
-    var sessionFromUrl = urlParams.get('session');
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionFromUrl = urlParams.get('session');
     if (sessionFromUrl) {
-        document.getElementById('sessionCode').value = sessionFromUrl.toUpperCase();
-        console.log('🔗 Session code found in URL:', sessionFromUrl);
+        const sessionCodeInput = document.getElementById('sessionCode');
+        if (sessionCodeInput) {
+            sessionCodeInput.value = sessionFromUrl.toUpperCase();
+            console.log('🔗 Pre-filled session code from URL:', sessionFromUrl);
+        }
     }
     
     // Initialize socket connection
     initializeSocket();
     
-    console.log('✅ Application initialized successfully');
+    console.log('✅ Planning Poker app initialized');
 }
 
 function initializeSocket() {
-    console.log('🔌 Connecting to serverless backend...');
+    // Connect to local development server
+    const serverUrl = 'http://localhost:3001';
     
-    // For serverless, we need to detect the environment
-    var isLocal = window.location.hostname === 'localhost' || 
-                  window.location.hostname === '127.0.0.1';
-    
-    var serverUrl;
-    if (isLocal) {
-        // Local serverless development
-        serverUrl = 'http://localhost:3001';
-        console.log('🏠 Using local serverless endpoint:', serverUrl);
-    } else {
-        // Production serverless (will be WebSocket API Gateway)
-        serverUrl = window.location.origin;
-        console.log('☁️ Using production serverless endpoint:', serverUrl);
-    }
-    
-    gameState.socket = io(serverUrl, {
-        transports: ['websocket', 'polling'], // Allow fallback to polling
-        timeout: 10000, // 10 second timeout
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        maxReconnectionAttempts: 5
-    });
+    console.log('🔌 Connecting to Socket.IO server...');
+    gameState.socket = io(serverUrl);
     
     // Connection event handlers
-    gameState.socket.on('connect', function() {
-        console.log('✅ Connected to serverless backend');
+    gameState.socket.on('connect', () => {
+        console.log('✅ Connected to server:', gameState.socket.id);
         gameState.isConnected = true;
         hideError();
         hideLoading();
-        updateConnectionStatus('Connected to server');
     });
     
-    gameState.socket.on('disconnect', function(reason) {
-        console.log('❌ Disconnected from server:', reason);
+    gameState.socket.on('disconnect', () => {
+        console.log('❌ Disconnected from server');
         gameState.isConnected = false;
-        showLoading('Connection lost. Reconnecting...');
-        updateConnectionStatus('Disconnected - ' + reason);
+        showError('Connection lost. Trying to reconnect...');
+        showLoading();
     });
     
-    gameState.socket.on('connect_error', function(error) {
+    gameState.socket.on('connect_error', (error) => {
         console.error('🔥 Connection error:', error);
-        showError('Unable to connect to serverless backend. Please check your connection.');
-        updateConnectionStatus('Connection failed');
-    });
-    
-    gameState.socket.on('reconnect', function(attemptNumber) {
-        console.log('🔄 Reconnected after ' + attemptNumber + ' attempts');
-        hideLoading();
-        updateConnectionStatus('Reconnected to server');
-    });
-    
-    gameState.socket.on('reconnect_failed', function() {
-        console.error('💀 Reconnection failed');
-        showError('Could not reconnect to server. Please refresh the page.');
-        updateConnectionStatus('Reconnection failed');
+        showError('Unable to connect to server. Please refresh the page.');
     });
     
     // Game event handlers
-    gameState.socket.on('joinedSession', function(data) {
+    gameState.socket.on('joinedSession', (data) => {
         console.log('🎮 Joined session successfully:', data);
         
         gameState.sessionCode = data.sessionCode;
@@ -108,48 +128,55 @@ function initializeSocket() {
         gameState.isSpectator = data.isSpectator;
         
         // Update URL without page reload
-        var newUrl = window.location.origin + window.location.pathname + '?session=' + data.sessionCode;
+        const newUrl = `${window.location.origin}${window.location.pathname}?session=${data.sessionCode}`;
         window.history.pushState({}, '', newUrl);
         
+        // Show game interface
         showGameInterface(data);
     });
     
-    gameState.socket.on('sessionUpdate', function(sessionState) {
-        console.log('📊 Session state updated:', sessionState);
-        gameState.sessionState = sessionState.state || sessionState;
+    gameState.socket.on('sessionUpdate', (data) => {
+        console.log('📊 Session updated:', data);
+        gameState.sessionState = data.state;
         updateGameInterface();
     });
     
-    gameState.socket.on('votesReset', function() {
-        console.log('🔄 Votes have been reset');
+    gameState.socket.on('votesReset', () => {
+        console.log('🔄 Votes reset');
         clearSelectedVote();
         updateStatus('New voting round started. Cast your votes!');
-        hideError();
     });
     
-    gameState.socket.on('sessionEnded', function(data) {
+    gameState.socket.on('sessionEnded', (data) => {
         console.log('🚪 Session ended:', data);
         showError(data.message || 'Session has ended');
-        setTimeout(function() {
+        setTimeout(() => {
             window.location.reload();
         }, 3000);
     });
     
-    gameState.socket.on('error', function(data) {
+    gameState.socket.on('error', (data) => {
         console.error('⚠️ Server error:', data);
         showError(data.message || 'An error occurred');
     });
-    
-    // Start with loading state
-    showLoading('Connecting to serverless backend...');
 }
 
 // Join or create session
 function joinSession() {
-    var playerName = document.getElementById('playerName').value.trim();
-    var sessionCode = document.getElementById('sessionCode').value.trim().toUpperCase();
+    console.log('🎯 Join session button clicked');
     
-    console.log('🎯 Attempting to join session:', { playerName: playerName, sessionCode: sessionCode });
+    const playerNameInput = document.getElementById('playerName');
+    const sessionCodeInput = document.getElementById('sessionCode');
+    
+    if (!playerNameInput || !sessionCodeInput) {
+        showError('Form elements not found. Please refresh the page.');
+        return;
+    }
+    
+    const playerName = playerNameInput.value.trim();
+    const sessionCode = sessionCodeInput.value.trim().toUpperCase();
+    
+    console.log('📝 Form data:', { playerName, sessionCode });
     
     // Validation
     if (!playerName) {
@@ -167,26 +194,26 @@ function joinSession() {
         return;
     }
     
-    showLoading('Joining session...');
+    showLoading();
     hideError();
     
     // Determine if creating new session or joining existing
-    var isSpectator = !sessionCode; // Creator becomes spectator
-    var finalSessionCode = sessionCode || generateSessionCode();
+    const isSpectator = !sessionCode; // Creator becomes spectator
+    const finalSessionCode = sessionCode || generateSessionCode();
     
-    console.log((isSpectator ? 'Creating' : 'Joining') + ' session: ' + finalSessionCode);
+    console.log(`🎯 ${isSpectator ? 'Creating' : 'Joining'} session: ${finalSessionCode}`);
     
-    // Send join request to serverless backend
+    // Send join request to server
     gameState.socket.emit('joinSession', {
         sessionCode: finalSessionCode,
-        playerName: playerName,
-        isSpectator: isSpectator
+        playerName,
+        isSpectator
     });
 }
 
 // Cast a vote
 function castVote(value) {
-    console.log('🗳️ Attempting to cast vote:', value);
+    console.log(`🗳️ Vote button clicked: ${value}`);
     
     if (!gameState.isConnected) {
         showError('Not connected to server');
@@ -199,21 +226,22 @@ function castVote(value) {
     }
     
     if (gameState.sessionState.votesRevealed && gameState.sessionState.hasConsensus) {
-        console.log('⏸️ Voting disabled - consensus reached');
-        return;
+        console.log('🚫 Voting disabled - consensus already reached');
+        return; // Don't allow voting after consensus
     }
+    
+    console.log(`🗳️ Casting vote: ${value}`);
     
     // Update UI immediately for responsiveness
     updateSelectedVote(value);
     
-    // Send vote to serverless backend
+    // Send vote to server
     gameState.socket.emit('castVote', { vote: value });
-    console.log('✅ Vote sent to server');
 }
 
 // Reset votes (Spectator only)
 function resetVotes() {
-    console.log('🔄 Attempting to reset votes');
+    console.log('🔄 Reset votes button clicked');
     
     if (!gameState.isConnected) {
         showError('Not connected to server');
@@ -225,31 +253,43 @@ function resetVotes() {
         return;
     }
     
+    console.log('🔄 Resetting votes');
     gameState.socket.emit('resetVotes');
-    console.log('✅ Reset request sent to server');
 }
 
 // UI Helper Functions
 function showGameInterface(sessionData) {
-    console.log('🎮 Showing game interface');
+    console.log('🎮 Showing game interface:', sessionData);
     
     // Hide join form
-    document.getElementById('joinForm').style.display = 'none';
+    const joinForm = document.getElementById('joinForm');
+    if (joinForm) {
+        joinForm.style.display = 'none';
+    }
     
     // Show game interface
-    document.getElementById('gameInterface').style.display = 'block';
+    const gameInterface = document.getElementById('gameInterface');
+    if (gameInterface) {
+        gameInterface.style.display = 'block';
+    }
     
     // Update session info
-    document.getElementById('currentSessionCode').textContent = sessionData.sessionCode;
+    const currentSessionCode = document.getElementById('currentSessionCode');
+    if (currentSessionCode) {
+        currentSessionCode.textContent = sessionData.sessionCode;
+    }
     
-    // Create share URL
-    var shareUrl = window.location.origin + window.location.pathname + '?session=' + sessionData.sessionCode;
-    document.getElementById('shareLink').textContent = shareUrl;
-    document.getElementById('shareLink').setAttribute('data-url', shareUrl);
+    const shareLink = document.getElementById('shareLink');
+    if (shareLink) {
+        shareLink.textContent = sessionData.shareUrl || `http://localhost:8080?session=${sessionData.sessionCode}`;
+    }
     
     // Show spectator controls if spectator
     if (sessionData.isSpectator) {
-        document.getElementById('spectatorControls').style.display = 'block';
+        const spectatorControls = document.getElementById('spectatorControls');
+        if (spectatorControls) {
+            spectatorControls.style.display = 'flex';
+        }
         updateStatus('You are the Spectator. Share the link above with your team.');
     } else {
         updateStatus('Connected to session. Cast your vote when ready!');
@@ -265,71 +305,65 @@ function updateGameInterface() {
 }
 
 function updatePlayerCards() {
-    var container = document.getElementById('playerCards');
+    const container = document.getElementById('playerCards');
+    if (!container) return;
+    
     container.innerHTML = '';
     
-    console.log('👥 Updating player cards:', gameState.sessionState.players);
-    
-    var players = gameState.sessionState.players || {};
-    for (var name in players) {
-        if (players.hasOwnProperty(name)) {
-            var player = players[name];
-            
-            var playerDiv = document.createElement('div');
-            playerDiv.className = 'player-card';
-            
-            var nameDiv = document.createElement('div');
-            nameDiv.className = 'player-name' + (player.isSpectator ? ' spectator' : '');
-            nameDiv.textContent = name + (player.isSpectator ? ' (Spectator)' : '');
-            
-            var cardDiv = document.createElement('div');
-            cardDiv.className = 'vote-card';
-            
-            if (player.isSpectator) {
-                cardDiv.classList.add('no-vote');
-                cardDiv.textContent = '👁️';
-            } else if (!player.hasVoted) {
-                cardDiv.classList.add('no-vote');
-                cardDiv.textContent = '?';
-            } else if (gameState.sessionState.votesRevealed && player.vote !== null) {
-                cardDiv.classList.add('revealed');
-                cardDiv.textContent = player.vote;
-            } else {
-                cardDiv.classList.add('hidden');
-                cardDiv.textContent = '✓';
-            }
-            
-            playerDiv.appendChild(nameDiv);
-            playerDiv.appendChild(cardDiv);
-            container.appendChild(playerDiv);
+    Object.entries(gameState.sessionState.players).forEach(([name, player]) => {
+        const playerDiv = document.createElement('div');
+        playerDiv.className = 'player-card';
+        
+        const nameDiv = document.createElement('div');
+        nameDiv.className = `player-name${player.isSpectator ? ' spectator' : ''}`;
+        nameDiv.textContent = `${name}${player.isSpectator ? ' (Spectator)' : ''}`;
+        
+        const cardDiv = document.createElement('div');
+        cardDiv.className = 'vote-card';
+        
+        if (player.isSpectator) {
+            cardDiv.classList.add('no-vote');
+            cardDiv.textContent = '👁️';
+        } else if (!player.hasVoted) {
+            cardDiv.classList.add('no-vote');
+            cardDiv.textContent = '?';
+        } else if (gameState.sessionState.votesRevealed && player.vote !== null) {
+            cardDiv.classList.add('revealed');
+            cardDiv.textContent = player.vote;
+        } else {
+            cardDiv.classList.add('hidden');
+            cardDiv.textContent = '✓';
         }
-    }
+        
+        playerDiv.appendChild(nameDiv);
+        playerDiv.appendChild(cardDiv);
+        container.appendChild(playerDiv);
+    });
 }
 
 function updateVotingCards() {
-    var cards = document.querySelectorAll('.fibonacci-card');
-    var shouldDisable = gameState.isSpectator || 
-                       (gameState.sessionState.votesRevealed && gameState.sessionState.hasConsensus);
+    const cards = document.querySelectorAll('.fibonacci-card');
+    const shouldDisable = gameState.isSpectator || 
+                         (gameState.sessionState.votesRevealed && gameState.sessionState.hasConsensus);
     
-    for (var i = 0; i < cards.length; i++) {
+    cards.forEach(card => {
         if (shouldDisable) {
-            cards[i].classList.add('disabled');
+            card.classList.add('disabled');
         } else {
-            cards[i].classList.remove('disabled');
+            card.classList.remove('disabled');
         }
-    }
+    });
 }
 
 function updateSelectedVote(value) {
     // Clear previous selection
-    var cards = document.querySelectorAll('.fibonacci-card');
-    for (var i = 0; i < cards.length; i++) {
-        cards[i].classList.remove('selected');
-    }
+    document.querySelectorAll('.fibonacci-card').forEach(card => {
+        card.classList.remove('selected');
+    });
     
     // Select new vote
     if (value) {
-        var selectedCard = document.querySelector('[data-value="' + value + '"]');
+        const selectedCard = document.querySelector(`[data-value="${value}"]`);
         if (selectedCard) {
             selectedCard.classList.add('selected');
         }
@@ -341,7 +375,8 @@ function clearSelectedVote() {
 }
 
 function updateStatus(message) {
-    var statusEl = document.getElementById('status');
+    const statusEl = document.getElementById('status');
+    if (!statusEl) return;
     
     if (message) {
         statusEl.textContent = message;
@@ -350,46 +385,28 @@ function updateStatus(message) {
     }
     
     // Auto-generate status based on game state
-    var players = gameState.sessionState.players || {};
-    var nonSpectators = [];
-    var votedCount = 0;
-    
-    for (var name in players) {
-        if (players.hasOwnProperty(name)) {
-            var player = players[name];
-            if (!player.isSpectator) {
-                nonSpectators.push(player);
-                if (player.hasVoted) {
-                    votedCount++;
-                }
-            }
-        }
-    }
-    
-    var totalVoters = nonSpectators.length;
+    const players = gameState.sessionState.players;
+    const nonSpectators = Object.entries(players).filter(([_, player]) => !player.isSpectator);
+    const totalVoters = nonSpectators.length;
+    const votedCount = nonSpectators.filter(([_, player]) => player.hasVoted).length;
     
     if (totalVoters === 0) {
         statusEl.textContent = 'Waiting for voters to join...';
         statusEl.className = 'status';
     } else if (gameState.sessionState.votesRevealed) {
         if (gameState.sessionState.hasConsensus) {
-            var consensusVote = null;
-            for (var name in players) {
-                if (players.hasOwnProperty(name)) {
-                    var player = players[name];
-                    if (!player.isSpectator && player.hasVoted) {
-                        consensusVote = player.vote;
-                        break;
-                    }
-                }
-            }
-            statusEl.innerHTML = '<div class="consensus">🎉 Consensus Reached! Story Points: ' + consensusVote + ' 🎉</div>';
+            const consensusVote = nonSpectators.find(([_, player]) => player.hasVoted)?.[1]?.vote;
+            statusEl.innerHTML = `
+                <div class="consensus">
+                    🎉 Consensus Reached! Story Points: ${consensusVote} 🎉
+                </div>
+            `;
         } else {
             statusEl.textContent = 'No consensus reached. Spectator can reset for re-vote.';
             statusEl.className = 'status';
         }
     } else {
-        statusEl.textContent = 'Voting: ' + votedCount + '/' + totalVoters + ' players voted';
+        statusEl.textContent = `Voting: ${votedCount}/${totalVoters} players voted`;
         statusEl.className = 'status';
     }
 }
@@ -400,99 +417,101 @@ function generateSessionCode() {
 }
 
 function copyShareLink() {
-    var shareLink = document.getElementById('shareLink').getAttribute('data-url') || 
-                   document.getElementById('shareLink').textContent;
+    const shareLink = document.getElementById('shareLink');
+    if (!shareLink) return;
+    
+    const shareLinkText = shareLink.textContent;
     
     if (navigator.clipboard) {
-        navigator.clipboard.writeText(shareLink).then(function() {
+        navigator.clipboard.writeText(shareLinkText).then(() => {
             showCopyFeedback('✅ Link copied to clipboard!');
-        }).catch(function() {
+        }).catch(() => {
             showCopyFeedback('❌ Unable to copy - please copy manually');
         });
     } else {
         // Fallback for older browsers
-        var textArea = document.createElement('textarea');
-        textArea.value = shareLink;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        showCopyFeedback('✅ Link copied to clipboard!');
+        showCopyFeedback('💡 Please copy the link manually');
     }
 }
 
 function showCopyFeedback(message) {
-    var linkEl = document.getElementById('shareLink');
-    var originalText = linkEl.textContent;
+    const linkEl = document.getElementById('shareLink');
+    if (!linkEl) return;
+    
+    const originalText = linkEl.textContent;
     
     linkEl.textContent = message;
-    setTimeout(function() {
+    setTimeout(() => {
         linkEl.textContent = originalText;
     }, 2000);
 }
 
-// Error and Loading States
+// Error and Loading States - Fixed with null checks
 function showError(message) {
     console.error('❌ Error:', message);
-    var errorEl = document.getElementById('errorMessage');
-    errorEl.textContent = message;
-    errorEl.style.display = 'block';
-    
-    // Auto-hide after 5 seconds
-    setTimeout(hideError, 5000);
+    const errorEl = document.getElementById('errorMessage');
+    if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.style.display = 'block';
+        
+        // Auto-hide after 5 seconds
+        setTimeout(hideError, 5000);
+    }
 }
 
 function hideError() {
-    document.getElementById('errorMessage').style.display = 'none';
+    const errorEl = document.getElementById('errorMessage');
+    if (errorEl) {
+        errorEl.style.display = 'none';
+    }
 }
 
-function showLoading(message) {
-    if (!message) message = 'Loading...';
-    console.log('⏳ Loading:', message);
-    var loadingEl = document.getElementById('loadingState');
-    loadingEl.textContent = message;
-    loadingEl.style.display = 'block';
+function showLoading() {
+    const loadingEl = document.getElementById('loadingState');
+    if (loadingEl) {
+        loadingEl.style.display = 'block';
+    }
 }
 
 function hideLoading() {
-    document.getElementById('loadingState').style.display = 'none';
-}
-
-function updateConnectionStatus(status) {
-    console.log('🔗 Connection status:', status);
-    // Could display connection status in UI if needed
+    const loadingEl = document.getElementById('loadingState');
+    if (loadingEl) {
+        loadingEl.style.display = 'none';
+    }
 }
 
 // Keyboard shortcuts
 document.addEventListener('keydown', function(event) {
     // Only handle shortcuts when in game interface
-    if (document.getElementById('gameInterface').style.display === 'none') {
+    const gameInterface = document.getElementById('gameInterface');
+    if (!gameInterface || gameInterface.style.display === 'none') {
         return;
     }
     
     // Number keys 1-6 for Fibonacci votes
-    var fibValues = [1, 2, 3, 5, 8, 13];
-    var keyNum = parseInt(event.key);
+    const fibValues = [1, 2, 3, 5, 8, 13];
+    const keyNum = event.key ? parseInt(event.key) : null;
     
     if (keyNum >= 1 && keyNum <= 6) {
         castVote(fibValues[keyNum - 1]);
     }
     
     // R for reset (spectator only)
-    if (event.key.toLowerCase() === 'r' && gameState.isSpectator) {
+    if (event.key && event.key.toLowerCase() === 'r' && gameState.isSpectator) {
         resetVotes();
     }
 });
 
 // Handle browser back/forward
 window.addEventListener('popstate', function(event) {
-    console.log('🔙 Browser navigation detected');
     // Refresh page if user navigates back/forward
     window.location.reload();
 });
 
-// Make functions globally available
+// Make functions globally available - MOVED TO END
 window.joinSession = joinSession;
 window.castVote = castVote;
 window.resetVotes = resetVotes;
 window.copyShareLink = copyShareLink;
+
+console.log('📱 Planning Poker client loaded successfully');
