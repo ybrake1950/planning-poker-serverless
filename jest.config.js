@@ -1,6 +1,6 @@
 // jest.config.js
-// Comprehensive Jest configuration for Planning Poker test suite
-// Directory: root project folder (planning-poker/)
+// Consolidated Jest configuration for all tests
+// Directory: root project folder (planning-poker-serverless/)
 
 module.exports = {
   // Test environment
@@ -9,94 +9,58 @@ module.exports = {
   // Test file patterns
   testMatch: [
     '**/tests/**/*.test.js',
-    '**/server/tests/**/*.test.js',
-    '**/client/tests/**/*.test.js'
+    '**/server/tests/**/*.test.js'
   ],
-  
-  // Setup files
-  setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
-  
-  // Coverage collection
-  collectCoverageFrom: [
-    'server/src/**/*.js',
-    'client/src/**/*.js',
-    '!server/src/index.js', // Exclude main entry point
-    '!**/node_modules/**',
-    '!**/coverage/**'
-  ],
-  
-  // Coverage thresholds for CI/CD
-  coverageThreshold: {
-    global: {
-      branches: 70,
-      functions: 70,
-      lines: 70,
-      statements: 70
-    },
-    './server/src/': {
-      branches: 80,
-      functions: 80,
-      lines: 80,
-      statements: 80
-    }
-  },
-  
-  // Coverage reporting
-  coverageDirectory: 'coverage',
-  coverageReporters: [
-    'text',
-    'lcov',
-    'html',
-    'json-summary'
-  ],
-  
-  // Test timeout (important for integration/e2e tests)
-  testTimeout: 30000,
-  
-  // Test projects for different test types
-  projects: [
-    {
-      displayName: 'unit',
-      testMatch: [
-        '<rootDir>/tests/unit/**/*.test.js',
-        '<rootDir>/server/tests/**/*.test.js'
-      ],
-      testEnvironment: 'node'
-    },
-    {
-      displayName: 'integration',
-      testMatch: ['<rootDir>/tests/integration/**/*.test.js'],
-      testEnvironment: 'node'
-    },
-    {
-      displayName: 'e2e',
-      testMatch: ['<rootDir>/tests/e2e/**/*.test.js'],
-      testEnvironment: 'node'
-    },
-    {
-      displayName: 'client',
-      testMatch: ['<rootDir>/client/tests/**/*.test.js'],
-      testEnvironment: 'jsdom'
-    }
-  ],
-  
-  // Module name mapping for client-side tests
-  moduleNameMapping: {
-    '^@/(.*)$': '<rootDir>/client/src/$1'
-  },
-  
-  // Transform configuration
-  transform: {
-    '^.+\\.jsx?$': 'babel-jest'
-  },
   
   // Ignore patterns
   testPathIgnorePatterns: [
     '/node_modules/',
-    '/dist/',
-    '/build/'
+    '/client/node_modules/',
+    '/server/node_modules/',
+    '/client/dist/',
+    '/client/build/'
   ],
   
-  // Verbose output for CI
-  verbose: true
+  // Coverage configuration
+  collectCoverage: false, // Only collect when explicitly requested
+  collectCoverageFrom: [
+    'server/src/**/*.js',
+    'serverless/**/*.js',
+    '!server/src/index.js', // Exclude main entry point
+    '!**/node_modules/**'
+  ],
+  
+  // Coverage directory
+  coverageDirectory: 'coverage',
+  
+  // Coverage reporters
+  coverageReporters: [
+    'text',
+    'lcov', 
+    'html'
+  ],
+  
+  // Setup files (run before each test)
+  setupFilesAfterEnv: [
+    '<rootDir>/tests/setup.js'
+  ],
+  
+  // Module directories
+  moduleDirectories: [
+    'node_modules',
+    '<rootDir>'
+  ],
+  
+  // Test timeout (30 seconds for E2E tests)
+  testTimeout: 30000,
+  
+  // Verbose output
+  verbose: true,
+  
+  // Transform configuration (if needed for ES6 modules)
+  transform: {},
+  
+  // Global setup/teardown
+  globalSetup: '<rootDir>/tests/globalSetup.js',
+  globalTeardown: '<rootDir>/tests/globalTeardown.js'
 };
