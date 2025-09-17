@@ -54,6 +54,19 @@ class PlanningPokerApp {
         }
     }
     
+    // Environment detection for WebSocket URL
+    getWebSocketUrl() {
+        const isLocal = window.location.hostname === 'localhost';
+        const isS3 = window.location.hostname.includes('s3-website');
+        
+        if (isLocal) {
+            return 'ws://localhost:3001';
+        } else {
+            // Always use API Gateway WebSocket endpoint for production
+            return 'wss://z68hjg7br2.execute-api.us-east-1.amazonaws.com/prod';
+        }
+    }
+    
     async handleLogin() {
         const password = this.elements.teamPassword.value.trim();
         const playerName = this.elements.playerName.value.trim();
@@ -72,15 +85,23 @@ class PlanningPokerApp {
     }
     
     async connectToServer(password, playerName, sessionCode, isSpectator) {
-        const serverUrl = window.location.hostname === 'localhost' ? 
-            'http://localhost:3001' : window.location.origin;
-        
         // Load Socket.IO if not available
         if (typeof io === 'undefined') {
             await this.loadSocketIO();
         }
         
-        this.socket = io(serverUrl);
+        // Use environment-aware WebSocket URL
+        const wsUrl = this.getWebSocketUrl();
+        console.log(`Connecting to WebSocket: ${wsUrl}`);
+        
+        this.socket = io(wsUrl, {
+            transports: ['websocket'],
+            timeout: 20000,
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 5
+        });
+        
         this.setupSocketListeners(password, playerName, sessionCode, isSpectator);
     }
     
@@ -96,6 +117,7 @@ class PlanningPokerApp {
     
     setupSocketListeners(password, playerName, sessionCode, isSpectator) {
         this.socket.on('connect', () => {
+            console.log('WebSocket connected successfully');
             this.socket.emit('joinSession', {
                 sessionCode: sessionCode || '',
                 playerName: playerName,
@@ -104,17 +126,34 @@ class PlanningPokerApp {
             });
         });
         
+        this.socket.on('connect_error', (error) => {
+            console.error('WebSocket connection error:', error);
+            this.showError('Failed to connect to server. Please try again.');
+        });
+        
         this.socket.on('sessionUpdate', (sessionState) => {
+            console.log('Session update received:', sessionState);
             this.showGameInterface();
             this.updateGameInterface(sessionState);
         });
         
         this.socket.on('error', (error) => {
+            console.error('Socket error:', error);
             this.showError(error.message || 'Connection failed');
         });
         
-        this.socket.on('disconnect', () => {
+        this.socket.on('disconnect', (reason) => {
+            console.log('WebSocket disconnected:', reason);
             this.showError('Disconnected from server');
+        });
+        
+        // Additional debugging
+        this.socket.on('reconnect', (attemptNumber) => {
+            console.log('WebSocket reconnected after', attemptNumber, 'attempts');
+        });
+        
+        this.socket.on('reconnect_error', (error) => {
+            console.error('WebSocket reconnection error:', error);
         });
     }
     
@@ -139,9 +178,13 @@ class PlanningPokerApp {
     }
     
     leaveSession() {
-        if (this.socket) this.socket.disconnect();
+        if (this.socket) {
+            this.socket.disconnect();
+        }
         this.showPasswordForm();
         this.elements.passwordFormElement.reset();
+        this.selectedVote = null;
+        this.updateVoteButtons();
     }
     
     updateGameInterface(sessionState) {
@@ -150,6 +193,13 @@ class PlanningPokerApp {
         
         this.updatePlayersDisplay(sessionState.players, sessionState.votesRevealed);
         this.updateSpectatorControls();
+        
+        // Update URL with session code for sharing
+        if (sessionCode !== 'UNKNOWN') {
+            const url = new URL(window.location);
+            url.searchParams.set('session', sessionCode);
+            window.history.replaceState({}, '', url);
+        }
     }
     
     updatePlayersDisplay(players, votesRevealed) {
@@ -159,6 +209,11 @@ class PlanningPokerApp {
             const playerCard = document.createElement('div');
             playerCard.className = 'player-card';
             
+            // Add current user indicator
+            if (playerName === this.currentUser) {
+                playerCard.classList.add('current-user');
+            }
+            
             const voteDisplay = playerData.isSpectator ? 
                 '👁️ Spectator' : 
                 (votesRevealed && playerData.vote !== null ? 
@@ -166,8 +221,8 @@ class PlanningPokerApp {
                     (playerData.hasVoted ? '✓ Voted' : '⏳ Waiting'));
             
             playerCard.innerHTML = `
-                <div>${playerName}</div>
-                <div>${voteDisplay}</div>
+                <div class="player-name">${playerName}${playerName === this.currentUser ? ' (You)' : ''}</div>
+                <div class="player-vote">${voteDisplay}</div>
             `;
             
             this.elements.playersGrid.appendChild(playerCard);
@@ -189,23 +244,43 @@ class PlanningPokerApp {
     showPasswordForm() {
         this.elements.passwordForm.classList.add('active');
         this.elements.gameInterface.classList.remove('active');
+        
+        // Clear any error messages
+        this.elements.errorMessage.style.display = 'none';
     }
     
     showGameInterface() {
         this.elements.passwordForm.classList.remove('active');
         this.elements.gameInterface.classList.add('active');
+        
+        // Clear any error messages
+        this.elements.errorMessage.style.display = 'none';
     }
     
     showError(message) {
         this.elements.errorMessage.textContent = message;
         this.elements.errorMessage.style.display = 'block';
+        
+        // Auto-hide error after 5 seconds
         setTimeout(() => {
-            this.elements.errorMessage.style.display = 'none';
+            if (this.elements.errorMessage.style.display !== 'none') {
+                this.elements.errorMessage.style.display = 'none';
+            }
         }, 5000);
     }
 }
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    new PlanningPokerApp();
+    const app = new PlanningPokerApp();
+    
+    // Add global error handler for debugging
+    window.addEventListener('error', (event) => {
+        console.error('Global error:', event.error);
+    });
+    
+    // Debug info
+    console.log('Planning Poker App initialized');
+    console.log('Current hostname:', window.location.hostname);
+    console.log('WebSocket URL will be:', new PlanningPokerApp().getWebSocketUrl());
 });
