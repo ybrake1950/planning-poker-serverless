@@ -1,4 +1,6 @@
-# serverless.yml - Fixed version with compatible plugins
+# Corrected serverless.yml (Fixed Outputs section)
+# File: serverless.yml (replace your existing file)
+
 service: planning-poker-serverless
 
 provider:
@@ -11,7 +13,8 @@ provider:
   environment:
     SESSIONS_TABLE: ${self:service}-sessions-${self:provider.stage}
     CONNECTIONS_TABLE: ${self:service}-connections-${self:provider.stage}
-    CORS_ORIGIN: ${env:CORS_ORIGIN, 'http://localhost:8080'}
+    CORS_ORIGIN: ${env:CORS_ORIGIN, 'https://team2playscards.com'}
+    FRONTEND_URL: ${env:FRONTEND_URL, 'https://team2playscards.com'}
     NODE_ENV: ${self:provider.stage}
   
   # IAM permissions for Lambda functions
@@ -74,7 +77,16 @@ functions:
       - http:
           path: /api/sessions
           method: post
-          cors: true
+          cors:
+            origin: 'https://team2playscards.com'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: false
           
   getSession:
     handler: serverless/api.getSession
@@ -82,7 +94,16 @@ functions:
       - http:
           path: /api/sessions/{sessionCode}
           method: get
-          cors: true
+          cors:
+            origin: 'https://team2playscards.com'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: false
           
   healthCheck:
     handler: serverless/api.healthCheck
@@ -90,30 +111,43 @@ functions:
       - http:
           path: /api/health
           method: get
-          cors: true
+          cors:
+            origin: 'https://team2playscards.com'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: false
 
-# DynamoDB Tables
+# DynamoDB Tables and CloudWatch Resources
 resources:
   Resources:
     SessionsTable:
       Type: AWS::DynamoDB::Table
       Properties:
         TableName: ${self:provider.environment.SESSIONS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        TimeToLiveSpecification:
+          AttributeName: expiresAt
+          Enabled: true
         AttributeDefinitions:
           - AttributeName: sessionCode
             AttributeType: S
         KeySchema:
           - AttributeName: sessionCode
             KeyType: HASH
+        
+    ConnectionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.CONNECTIONS_TABLE}
         BillingMode: PAY_PER_REQUEST
         TimeToLiveSpecification:
           AttributeName: expiresAt
           Enabled: true
-          
-    ConnectionsTable:
-      Type: AWS::DynamoDB::Table  
-      Properties:
-        TableName: ${self:provider.environment.CONNECTIONS_TABLE}
         AttributeDefinitions:
           - AttributeName: connectionId
             AttributeType: S
@@ -129,18 +163,17 @@ resources:
                 KeyType: HASH
             Projection:
               ProjectionType: ALL
-        BillingMode: PAY_PER_REQUEST
-        TimeToLiveSpecification:
-          AttributeName: expiresAt
-          Enabled: true
 
-# Plugins - Using compatible versions
-plugins:
-  - serverless-offline
+  # Fixed: Outputs section moved inside resources
+  Outputs:
+    ApiGatewayRestApiId:
+      Value:
+        Ref: ApiGatewayRestApi
+      Export:
+        Name: ${self:service}-${self:provider.stage}-restApiId
 
-# Custom configuration
-custom:
-  serverless-offline:
-    httpPort: 3001
-    websocketPort: 3002
-    lambdaPort: 3003
+    WebSocketApiId:
+      Value:
+        Ref: WebsocketsApi
+      Export:
+        Name: ${self:service}-${self:provider.stage}-websocketApiId

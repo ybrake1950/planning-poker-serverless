@@ -1,7 +1,6 @@
 // serverless/index.js
-// Main server file for Planning Poker application
-// Merged: Original WebSocket server + Serverless architecture preparation
-// Enhanced features
+// Updated Planning Poker server with password protection
+// Enhanced version of your existing server
 
 const express = require('express');
 const http = require('http');
@@ -17,7 +16,7 @@ const io = socketIo(server, {
     cors: {
         origin: process.env.NODE_ENV === 'production' 
             ? "https://team2playscards.com" 
-            : "http://localhost:3000",
+            : ["http://localhost:3000", "http://localhost:8080"],
         methods: ["GET", "POST"]
     }
 });
@@ -26,15 +25,18 @@ const io = socketIo(server, {
 app.use(cors({
     origin: process.env.NODE_ENV === 'production' 
         ? "https://team2playscards.com" 
-        : "http://localhost:3000",
+        : ["http://localhost:3000", "http://localhost:8080"],
     credentials: true
 }));
 
 // Body parsing middleware
 app.use(express.json());
 
+// Password Protection Configuration
+const TEAM_PASSWORD = process.env.TEAM_PASSWORD || 'planning2024';
+console.log('🔒 Password protection enabled. Team password set.');
+
 // In-memory session storage
-// NOTE: In production serverless, this would be DynamoDB
 const sessions = new Map();
 const sessionTimeouts = new Map();
 
@@ -44,6 +46,10 @@ const SESSION_TIMEOUT = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 // Utility functions
 function generateSessionCode() {
     return Math.random().toString(36).substr(2, 8).toUpperCase();
+}
+
+function validatePassword(providedPassword) {
+    return providedPassword && providedPassword === TEAM_PASSWORD;
 }
 
 function createSession(sessionCode) {
@@ -63,12 +69,10 @@ function createSession(sessionCode) {
 }
 
 function scheduleSessionCleanup(sessionCode) {
-    // Clear existing timeout if it exists
     if (sessionTimeouts.has(sessionCode)) {
         clearTimeout(sessionTimeouts.get(sessionCode));
     }
     
-    // Set new cleanup timeout
     const timeoutId = setTimeout(() => {
         deleteSession(sessionCode);
     }, SESSION_TIMEOUT);
@@ -78,13 +82,12 @@ function scheduleSessionCleanup(sessionCode) {
 
 function deleteSession(sessionCode) {
     if (sessions.has(sessionCode)) {
-        // Notify all players that session is ending
         io.to(sessionCode).emit('sessionEnded', { 
             message: 'Session ended due to inactivity' 
         });
         
         sessions.delete(sessionCode);
-        console.log(`🗑️  Session cleaned up: ${sessionCode}`);
+        console.log(`🗑️ Session cleaned up: ${sessionCode}`);
     }
     
     if (sessionTimeouts.has(sessionCode)) {
@@ -102,7 +105,7 @@ function updateSessionActivity(sessionCode) {
 
 function checkConsensus(session) {
     const votes = Array.from(session.players.values())
-        .filter(player => player.hasVoted)
+        .filter(player => player.hasVoted && !player.isSpectator)
         .map(player => player.vote);
     
     if (votes.length === 0) return false;
@@ -126,194 +129,293 @@ function getSessionState(session) {
     };
 }
 
-// API Routes
-// Add this middleware before your existing routes
-app.use('/api/sessions', (req, res, next) => {
-    // Skip password check for health endpoint
-    if (req.path === '/health') {
-        return next();
-    }
-    
+// API Routes with Password Protection
+
+// Health check endpoint (no password required)
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        version: '2.0-password-protected',
+        passwordProtected: true
+    });
+});
+
+// Password validation middleware for API routes
+function requirePassword(req, res, next) {
     const providedPassword = req.headers['x-team-password'] || req.body.password;
     
-    if (!providedPassword || providedPassword !== TEAM_PASSWORD) {
+    if (!validatePassword(providedPassword)) {
         return res.status(401).json({
             error: 'Access denied',
-            message: 'Valid team password required'
+            message: 'Valid team password required',
+            code: 'INVALID_PASSWORD'
         });
     }
     
     next();
-});
-app.get('/api/health', (req, res) => {
-    res.json({ 
-        status: 'healthy', 
-        timestamp: new Date().toISOString(),
-        activeSessions: sessions.size
-    });
-});
+}
 
-app.post('/api/sessions', (req, res) => {
-    const sessionCode = generateSessionCode();
-    const session = createSession(sessionCode);
-    
-    res.json({ 
-        sessionCode,
-        shareUrl: `${req.protocol}://${req.get('host')}?session=${sessionCode}`
-    });
-});
-
-app.get('/api/sessions/:sessionCode', (req, res) => {
-    const { sessionCode } = req.params;
-    const session = sessions.get(sessionCode);
-    
-    if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+// Create session endpoint (password required)
+app.post('/api/sessions', requirePassword, (req, res) => {
+    try {
+        const sessionCode = generateSessionCode();
+        createSession(sessionCode);
+        
+        const frontendUrl = process.env.NODE_ENV === 'production' 
+            ? 'https://team2playscards.com' 
+            : 'http://localhost:8080';
+        
+        res.json({
+            sessionCode: sessionCode,
+            shareUrl: `${frontendUrl}?session=${sessionCode}`,
+            message: 'Session created successfully'
+        });
+        
+        console.log(`📋 Session created via API: ${sessionCode}`);
+        
+    } catch (error) {
+        console.error('❌ Error creating session:', error);
+        res.status(500).json({
+            error: 'Failed to create session',
+            message: error.message
+        });
     }
-    
-    res.json({
-        sessionCode,
-        state: getSessionState(session),
-        shareUrl: `${req.protocol}://${req.get('host')}?session=${sessionCode}`
-    });
 });
 
-// WebSocket connection handling
-//io.on('connection', (socket) => {
-//    console.log(`🔌 Client connected: ${socket.id}`);
-// Modify your WebSocket connection to check password
+// Get session endpoint (password required)
+app.get('/api/sessions/:sessionCode', requirePassword, (req, res) => {
+    try {
+        const sessionCode = req.params.sessionCode.toUpperCase();
+        const session = sessions.get(sessionCode);
+        
+        if (!session) {
+            return res.status(404).json({
+                error: 'Session not found',
+                sessionCode: sessionCode
+            });
+        }
+        
+        res.json({
+            sessionCode: sessionCode,
+            state: getSessionState(session),
+            createdAt: session.createdAt,
+            lastActivity: session.lastActivity
+        });
+        
+    } catch (error) {
+        console.error('❌ Error getting session:', error);
+        res.status(500).json({
+            error: 'Failed to get session',
+            message: error.message
+        });
+    }
+});
+
+// WebSocket Connection with Password Protection
 io.on('connection', (socket) => {
-    console.log('New client connected:', socket.id);
+    console.log('🔌 New client connected:', socket.id);
     
-    // Require password for joining sessions
+    // Join session with password validation
     socket.on('joinSession', (data) => {
         const { sessionCode, playerName, password, isSpectator } = data;
         
-        // Check password for WebSocket connections
-        if (!password || password !== TEAM_PASSWORD) {
+        // Validate password
+        if (!validatePassword(password)) {
+            console.log(`❌ Invalid password attempt from ${playerName} (${socket.id})`);
             socket.emit('error', {
-                message: 'Invalid team password'
+                message: 'Invalid team password. Please check with your team admin.',
+                code: 'INVALID_PASSWORD'
             });
             return;
         }
         
-        // Continue with existing joinSession logic...
-        updateSessionActivity(sessionCode);
+        // Validate required fields
+        if (!playerName || playerName.trim().length === 0) {
+            socket.emit('error', {
+                message: 'Player name is required',
+                code: 'MISSING_NAME'
+            });
+            return;
+        }
         
-        if (!sessions.has(sessionCode)) {
-            createSession(sessionCode);
+        const cleanPlayerName = playerName.trim();
+        const cleanSessionCode = sessionCode ? sessionCode.trim().toUpperCase() : generateSessionCode();
+        
+        console.log(`✅ Authorized user ${cleanPlayerName} joining session ${cleanSessionCode}`);
+        
+        updateSessionActivity(cleanSessionCode);
+        
+        // Create session if it doesn't exist
+        if (!sessions.has(cleanSessionCode)) {
+            createSession(cleanSessionCode);
+        }
+        
+        const session = sessions.get(cleanSessionCode);
+        
+        // Check if player name is already taken (unless reconnecting)
+        if (session.players.has(cleanPlayerName)) {
+            const existingPlayer = session.players.get(cleanPlayerName);
+            // Allow reconnection by updating socket ID
+            existingPlayer.socketId = socket.id;
+            console.log(`🔄 Player ${cleanPlayerName} reconnected to session ${cleanSessionCode}`);
+        } else {
+            // Add new player to session
+            session.players.set(cleanPlayerName, {
+                hasVoted: false,
+                vote: null,
+                isSpectator: Boolean(isSpectator),
+                socketId: socket.id,
+                joinedAt: new Date()
+            });
+            console.log(`➕ Player ${cleanPlayerName} joined session ${cleanSessionCode} as ${isSpectator ? 'spectator' : 'voter'}`);
+        }
+        
+        // Join socket room
+        socket.join(cleanSessionCode);
+        
+        // Store session info on socket for cleanup
+        socket.sessionCode = cleanSessionCode;
+        socket.playerName = cleanPlayerName;
+        
+        // Send session state to all players
+        const sessionState = getSessionState(session);
+        sessionState.sessionCode = cleanSessionCode;
+        
+        io.to(cleanSessionCode).emit('sessionUpdate', sessionState);
+        
+        // Send success confirmation to joining player
+        socket.emit('joinSuccess', {
+            sessionCode: cleanSessionCode,
+            playerName: cleanPlayerName,
+            isSpectator: Boolean(isSpectator)
+        });
+    });
+    
+    // Cast vote
+    socket.on('castVote', (data) => {
+        const { sessionCode, vote } = data;
+        
+        if (!sessionCode || !sessions.has(sessionCode)) {
+            socket.emit('error', { message: 'Invalid session' });
+            return;
+        }
+        
+        if (!socket.playerName) {
+            socket.emit('error', { message: 'Player not identified' });
+            return;
         }
         
         const session = sessions.get(sessionCode);
+        const player = session.players.get(socket.playerName);
         
-        // Add player to session
-        session.players.set(playerName, {
-            hasVoted: false,
-            vote: null,
-            isSpectator: Boolean(isSpectator),
-            socketId: socket.id
-        });
-        
-        socket.join(sessionCode);
-        
-        // Send session state to all players
-        io.to(sessionCode).emit('sessionUpdate', getSessionState(session));
-        
-        console.log(`Player ${playerName} joined session ${sessionCode}`);
-    });  
-    // Join session
-    socket.on('joinSession', ({ sessionCode, playerName, isSpectator = false }) => {
-        try {
-            // Validate input
-            if (!sessionCode || !playerName) {
-                socket.emit('error', { message: 'Session code and player name required' });
-                return;
-            }
-            
-            if (playerName.length > 20) {
-                socket.emit('error', { message: 'Player name must be 20 characters or less' });
-                return;
-            }
-            
-            // Get or create session
-            let session = sessions.get(sessionCode);
-            if (!session) {
-                session = createSession(sessionCode);
-            }
-            
-            // Check if player name already exists
-            if (session.players.has(playerName)) {
-                socket.emit('error', { message: 'Player name already taken in this session' });
-                return;
-            }
-            
-            // Add player to session
-            session.players.set(playerName, {
-                socketId: socket.id,
-                vote: null,
-                hasVoted: false,
-                isSpectator,
-                joinedAt: new Date()
-            });
-            
-            // Join socket room
-            socket.join(sessionCode);
-            
-            // Store session info on socket
-            socket.sessionCode = sessionCode;
-            socket.playerName = playerName;
-            
-            updateSessionActivity(sessionCode);
-            
-            console.log(`👤 ${playerName} joined session ${sessionCode} as ${isSpectator ? 'Spectator' : 'Voter'}`);
-            
-            // Send success response to joining player
-            socket.emit('joinedSession', {
-                sessionCode,
-                playerName,
-                isSpectator,
-                shareUrl: `http://localhost:3000?session=${sessionCode}`
-            });
-            
-            // Broadcast updated state to all players in session
-            io.to(sessionCode).emit('sessionUpdate', getSessionState(session));
-            
-        } catch (error) {
-            console.error('Error joining session:', error);
-            socket.emit('error', { message: 'Failed to join session' });
+        if (!player) {
+            socket.emit('error', { message: 'Player not found in session' });
+            return;
         }
+        
+        if (player.isSpectator) {
+            socket.emit('error', { message: 'Spectators cannot vote' });
+            return;
+        }
+        
+        if (session.votesRevealed) {
+            socket.emit('error', { message: 'Voting has ended for this round' });
+            return;
+        }
+        
+        // Record the vote
+        player.hasVoted = true;
+        player.vote = vote;
+        updateSessionActivity(sessionCode);
+        
+        console.log(`🗳️ ${socket.playerName} voted ${vote} in session ${sessionCode}`);
+        
+        // Check if all players have voted (excluding spectators)
+        const votingPlayers = Array.from(session.players.values()).filter(p => !p.isSpectator);
+        const allVoted = votingPlayers.length > 0 && votingPlayers.every(p => p.hasVoted);
+        
+        if (allVoted) {
+            session.votesRevealed = true;
+            console.log(`🎉 All players voted in session ${sessionCode} - revealing votes`);
+        }
+        
+        // Send updated session state
+        const sessionState = getSessionState(session);
+        sessionState.sessionCode = sessionCode;
+        io.to(sessionCode).emit('sessionUpdate', sessionState);
     });
     
-    // Handle disconnection
+    // Reset votes (spectators only)
+    socket.on('resetVotes', (data) => {
+        const { sessionCode } = data;
+        
+        if (!sessionCode || !sessions.has(sessionCode)) {
+            socket.emit('error', { message: 'Invalid session' });
+            return;
+        }
+        
+        if (!socket.playerName) {
+            socket.emit('error', { message: 'Player not identified' });
+            return;
+        }
+        
+        const session = sessions.get(sessionCode);
+        const player = session.players.get(socket.playerName);
+        
+        if (!player || !player.isSpectator) {
+            socket.emit('error', { message: 'Only spectators can reset votes' });
+            return;
+        }
+        
+        // Reset all votes
+        session.players.forEach((playerData) => {
+            if (!playerData.isSpectator) {
+                playerData.hasVoted = false;
+                playerData.vote = null;
+            }
+        });
+        
+        session.votesRevealed = false;
+        updateSessionActivity(sessionCode);
+        
+        console.log(`🔄 Votes reset by spectator ${socket.playerName} in session ${sessionCode}`);
+        
+        // Send updated session state
+        const sessionState = getSessionState(session);
+        sessionState.sessionCode = sessionCode;
+        io.to(sessionCode).emit('sessionUpdate', sessionState);
+    });
+    
+    // Handle disconnect
     socket.on('disconnect', () => {
         console.log(`🔌 Client disconnected: ${socket.id}`);
         
         if (socket.sessionCode && socket.playerName) {
             const session = sessions.get(socket.sessionCode);
-            if (session) {
-                session.players.delete(socket.playerName);
-                console.log(`👋 ${socket.playerName} left session ${socket.sessionCode}`);
-                
-                // If session is empty, clean it up after a delay
-                if (session.players.size === 0) {
-                    setTimeout(() => {
-                        if (sessions.has(socket.sessionCode) && 
-                            sessions.get(socket.sessionCode).players.size === 0) {
-                            deleteSession(socket.sessionCode);
-                        }
-                    }, 30000); // 30 second delay
-                } else {
-                    // Broadcast updated state to remaining players
-                    io.to(socket.sessionCode).emit('sessionUpdate', getSessionState(session));
-                }
+            if (session && session.players.has(socket.playerName)) {
+                // Don't remove player immediately - they might reconnect
+                // Just log the disconnection
+                console.log(`👋 ${socket.playerName} disconnected from session ${socket.sessionCode}`);
             }
         }
     });
 });
 
-// Export for testing
-module.exports = { app, server, io };
-// Add to your server/src/index.js file
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error('💥 Server error:', err);
+    res.status(500).json({
+        error: 'Internal server error',
+        message: 'Something went wrong on our end'
+    });
+});
 
-// Environment variable for team password
-const TEAM_PASSWORD = process.env.TEAM_PASSWORD || 'Prime2025'; // Set this in production
+// Start server
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, () => {
+    console.log(`🚀 Planning Poker server running on port ${PORT}`);
+    console.log(`🔒 Password protection: ${TEAM_PASSWORD ? 'ENABLED' : 'DISABLED'}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`📝 CORS origins: ${process.env.NODE_ENV === 'production' ? 'team2playscards.com' : 'localhost:3000, localhost:8080'}`);
+});

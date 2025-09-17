@@ -3,471 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planning Poker - Agile Story Point Voting</title>
+    <title>Planning Poker - Team Access</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-
         .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .header h1 {
-            color: white;
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-
-        .header p {
-            color: rgba(255,255,255,0.9);
-            font-size: 1.1rem;
-        }
-
-        .card {
             background: white;
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            margin-bottom: 20px;
-        }
-
-        /* Join Form Styles */
-        .join-form {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            width: 100%;
             max-width: 400px;
-            margin: 0 auto;
         }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .form-group label {
-            font-weight: 600;
-            color: #555;
-        }
-
-        .form-group input {
-            padding: 12px;
-            border: 2px solid #e1e5e9;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-
-        .form-group input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
+        .view { display: none; }
+        .view.active { display: block; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
+        .form-group input { width: 100%; padding: 0.75rem; border: 2px solid #e1e5e9; border-radius: 5px; }
         .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .btn-primary {
+            width: 100%;
+            padding: 0.75rem;
             background: #667eea;
             color: white;
-        }
-
-        .btn-primary:hover {
-            background: #5a6fd8;
-            transform: translateY(-2px);
-        }
-
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: #5a6268;
-        }
-
-        /* Game Interface Styles */
-        .game-interface {
-            display: none;
-        }
-
-        .session-info {
-            text-align: center;
-            margin-bottom: 30px;
-            padding: 20px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 10px;
-            color: white;
-        }
-
-        .session-code {
-            font-size: 1.5rem;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-
-        .share-link {
-            font-size: 0.9rem;
-            word-break: break-all;
-            background: rgba(255,255,255,0.2);
-            padding: 10px;
+            border: none;
             border-radius: 5px;
             cursor: pointer;
+            margin: 0.5rem 0;
         }
-
-        .share-link:hover {
-            background: rgba(255,255,255,0.3);
-        }
-
-        /* Status Display */
-        .status {
-            text-align: center;
-            font-size: 1.2rem;
-            margin-bottom: 20px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-        }
-
-        .consensus {
-            background: linear-gradient(135deg, #11998e, #38ef7d);
-            color: white;
-            font-weight: bold;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-
-        /* Voting Cards */
-        .voting-section {
-            margin-bottom: 30px;
-        }
-
-        .voting-section h3 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #555;
-        }
-
-        .fibonacci-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-            gap: 15px;
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        .fibonacci-card {
-            aspect-ratio: 3/4;
-            background: white;
-            border: 3px solid #e1e5e9;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .fibonacci-card::before {
-            content: '';
-            position: absolute;
-            top: -2px;
-            left: -2px;
-            right: -2px;
-            bottom: -2px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 12px;
-            z-index: -1;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-
-        .fibonacci-card:hover {
-            transform: translateY(-5px);
-            border-color: #667eea;
-        }
-
-        .fibonacci-card:hover::before {
-            opacity: 1;
-        }
-
-        .fibonacci-card.selected {
-            border-color: #667eea;
-            background: #667eea;
-            color: white;
-            transform: translateY(-5px);
-        }
-
-        .fibonacci-card.selected::before {
-            opacity: 1;
-        }
-
-        .fibonacci-card.disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .fibonacci-card.disabled:hover {
-            transform: none;
-            border-color: #e1e5e9;
-        }
-
-        /* Player Cards */
-        .players-section h3 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #555;
-        }
-
-        .player-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 15px;
-        }
-
-        .player-card {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 15px;
-            text-align: center;
-        }
-
-        .player-name {
-            font-weight: 600;
-            margin-bottom: 10px;
-            color: #555;
-        }
-
-        .player-name.spectator {
-            color: #6c757d;
-            font-style: italic;
-        }
-
-        .vote-card {
-            width: 50px;
-            height: 70px;
-            background: white;
-            border: 2px solid #e1e5e9;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            font-weight: bold;
-            margin: 0 auto;
-        }
-
-        .vote-card.revealed {
-            background: #667eea;
-            color: white;
-            border-color: #667eea;
-        }
-
-        .vote-card.hidden {
-            background: #28a745;
-            color: white;
-            border-color: #28a745;
-        }
-
-        .vote-card.no-vote {
-            background: #f8f9fa;
-            color: #6c757d;
-        }
-
-        /* Spectator Controls */
-        .spectator-controls {
-            display: none;
-            justify-content: center;
-            margin-top: 20px;
-        }
-
-        /* Error and Loading States */
+        .btn:hover { background: #5a67d8; }
         .error-message {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 0.75rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
             display: none;
-            background: #dc3545;
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            text-align: center;
         }
-
-        .loading-state {
-            display: none;
-            text-align: center;
-            padding: 20px;
-            color: white;
+        .game-interface { max-width: 800px; }
+        .vote-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin: 1rem 0; }
+        .vote-btn {
+            width: 60px; height: 80px; background: white; border: 2px solid #4299e1;
+            border-radius: 8px; cursor: pointer; font-weight: bold;
         }
-
-        .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(255,255,255,0.3);
-            border-top: 4px solid white;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 10px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Mobile Responsive */
-        @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-            }
-
-            .header h1 {
-                font-size: 2rem;
-            }
-
-            .card {
-                padding: 20px;
-            }
-
-            .fibonacci-cards {
-                grid-template-columns: repeat(3, 1fr);
-            }
-
-            .player-cards {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
+        .vote-btn:hover, .vote-btn.selected { background: #4299e1; color: white; }
+        .players-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+        .player-card { background: white; border: 2px solid #e2e8f0; border-radius: 8px; padding: 1rem; text-align: center; }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
-        <div class="header">
+        <!-- Password Form -->
+        <div id="passwordForm" class="view active">
             <h1>🃏 Planning Poker</h1>
-            <p>Agile Story Point Estimation Tool</p>
-        </div>
-
-        <!-- Error Message -->
-        <div id="errorMessage" class="error-message"></div>
-
-        <!-- Loading State -->
-        <div id="loadingState" class="loading-state">
-            <div class="loading-spinner"></div>
-            <p>Connecting...</p>
-        </div>
-
-        <!-- Join Form -->
-        <div id="joinForm" class="card">
-            <div class="join-form">
+            <p>Team Access Required</p>
+            <div id="errorMessage" class="error-message"></div>
+            <form id="passwordFormElement">
                 <div class="form-group">
-                    <label for="playerName">Your Name</label>
-                    <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
+                    <label>Team Password:</label>
+                    <input type="password" id="teamPassword" required>
                 </div>
-                
                 <div class="form-group">
-                    <label for="sessionCode">Session Code (optional)</label>
-                    <input type="text" id="sessionCode" placeholder="Leave empty to create new session" maxlength="8">
+                    <label>Your Name:</label>
+                    <input type="text" id="playerName" required>
                 </div>
-                
-                <button class="btn btn-primary" id="joinButton">
-                    Join / Create Session
-                </button>
-                
-                <p style="text-align: center; color: #666; font-size: 0.9rem;">
-                    Leave session code empty to create a new session as the Spectator.<br>
-                    Enter a session code to join as a Voter.
-                </p>
-            </div>
+                <div class="form-group">
+                    <label>Session Code (optional):</label>
+                    <input type="text" id="sessionCode">
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" id="isSpectator"> Join as Spectator</label>
+                </div>
+                <button type="submit" class="btn">Join/Create Session</button>
+            </form>
         </div>
 
         <!-- Game Interface -->
-        <div id="gameInterface" class="game-interface">
-            <!-- Session Info -->
-            <div class="session-info">
-                <div class="session-code">
-                    Session: <span id="currentSessionCode"></span>
-                </div>
-                <div class="share-link" id="shareLink" title="Click to copy"></div>
-            </div>
-
-            <!-- Status -->
-            <div id="status" class="status">
-                Welcome! Waiting for players to join...
-            </div>
-
-            <!-- Voting Section -->
-            <div class="voting-section">
-                <div class="card">
-                    <h3>🎯 Cast Your Vote</h3>
-                    <div class="fibonacci-cards">
-                        <div class="fibonacci-card" data-value="1">1</div>
-                        <div class="fibonacci-card" data-value="2">2</div>
-                        <div class="fibonacci-card" data-value="3">3</div>
-                        <div class="fibonacci-card" data-value="5">5</div>
-                        <div class="fibonacci-card" data-value="8">8</div>
-                        <div class="fibonacci-card" data-value="13">13</div>
-                    </div>
+        <div id="gameInterface" class="view">
+            <h1>🃏 Planning Poker</h1>
+            <p>Session: <span id="currentSessionCode"></span></p>
+            
+            <div id="votingInterface">
+                <h3>Cast Your Vote:</h3>
+                <div class="vote-buttons" id="voteButtons">
+                    <button class="vote-btn" data-vote="1">1</button>
+                    <button class="vote-btn" data-vote="2">2</button>
+                    <button class="vote-btn" data-vote="3">3</button>
+                    <button class="vote-btn" data-vote="5">5</button>
+                    <button class="vote-btn" data-vote="8">8</button>
+                    <button class="vote-btn" data-vote="13">13</button>
                 </div>
             </div>
-
-            <!-- Players Section -->
-            <div class="players-section">
-                <div class="card">
-                    <h3>👥 Players</h3>
-                    <div id="playerCards" class="player-cards">
-                        <!-- Player cards will be dynamically generated -->
-                    </div>
-                </div>
+            
+            <div id="playersSection">
+                <h3>Players:</h3>
+                <div id="playersGrid" class="players-grid"></div>
             </div>
-
-            <!-- Spectator Controls -->
-            <div id="spectatorControls" class="spectator-controls">
-                <button class="btn btn-secondary" id="resetButton">
-                    🔄 Reset Votes
-                </button>
+            
+            <div id="spectatorControls" style="display: none;">
+                <button class="btn" id="resetVotesBtn">Reset All Votes</button>
             </div>
+            
+            <button class="btn" id="leaveSessionBtn">Leave Session</button>
         </div>
     </div>
-
-    <!-- Include Socket.IO from CDN -->
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </body>
 </html>
