@@ -1,292 +1,68 @@
-// serverless/game.js
-// Improved game logic handlers with better error handling
+// Fixed Planning Poker Backend - game.js (Socket.IO version)
+// Directory: Execute from server/ folder
+// Changes:
+// 1. Spectators can reset votes even after consensus
+// 2. Removed restriction preventing re-voting after consensus
+// 3. Better state management for re-voting scenarios
 
 const { 
   getSession, 
-  createSession, 
   updateSession, 
-  storeConnection, 
   getConnection,
-  getConnectionsBySession,
-  checkConsensus,
-  debugState
+  checkConsensus
 } = require('./db');
 
-const isOffline = process.env.IS_OFFLINE || process.env.NODE_ENV === 'development';
-
-// Function to send message to WebSocket connection
-async function sendToConnection(connectionId, message) {
-  console.log('📤 Sending message to', connectionId + ':', message.type);
-  
-  if (isOffline) {
-    // For local development with Socket.IO
-    if (global.simulateWebSocketMessage) {
-      const success = global.simulateWebSocketMessage(connectionId, message);
-      if (!success) {
-        console.log('❌ Failed to deliver message to', connectionId);
-      }
-    } else {
-      console.log('💻 Local dev: Would send message to', connectionId, message);
-    }
-    return Promise.resolve();
-  } else {
-    // Production: Use API Gateway Management API
-    const AWS = require('aws-sdk');
-    const apiGatewayManagementApi = new AWS.ApiGatewayManagementApi({
-      endpoint: process.env.WEBSOCKET_ENDPOINT
-    });
-    
-    try {
-      await apiGatewayManagementApi.postToConnection({
-        ConnectionId: connectionId,
-        Data: JSON.stringify(message)
-      }).promise();
-    } catch (error) {
-      if (error.statusCode === 410) {
-        console.log('🗑️ Stale connection removed:', connectionId);
-      }
-      throw error;
-    }
-  }
-}
-
-// Broadcast message to all connections in a session
-async function broadcastToSession(sessionCode, message) {
-  console.log('📡 Broadcasting', message.type, 'to session:', sessionCode);
+// Cast vote handler - FIXED: Allow re-voting when no consensus
+exports.handleCastVote = async (socket, data) => {
+  console.log('🗳️ Cast vote event from', socket.id, '- Vote:', data.vote);
   
   try {
-    const connections = await getConnectionsBySession(sessionCode);
-    
-    if (connections.length === 0) {
-      console.log('⚠️ No connections found for session:', sessionCode);
-      return;
-    }
-    
-    console.log('🔗 Broadcasting to', connections.length, 'connections');
-    
-    const promises = connections.map(async (conn) => {
-      try {
-        await sendToConnection(conn.connectionId, message);
-      } catch (error) {
-        console.error('❌ Failed to send to connection:', conn.connectionId, error.message);
-      }
-    });
-    
-    await Promise.all(promises);
-    console.log('✅ Broadcast completed');
-    
-  } catch (error) {
-    console.error('❌ Broadcast error:', error);
-  }
-}
-
-// Generate session code
-function generateSessionCode() {
-  return Math.random().toString(36).substr(2, 8).toUpperCase();
-}
-
-// Join session handler
-exports.joinSession = async (event) => {
-  const connectionId = event.requestContext.connectionId;
-  console.log('🎮 Join session handler called for connection:', connectionId);
-  
-  let body;
-  try {
-    body = JSON.parse(event.body);
-    console.log('📋 Join session data:', body);
-  } catch (error) {
-    console.error('❌ Invalid JSON in request body:', error);
-    await sendToConnection(connectionId, {
-      type: 'error',
-      message: 'Invalid request format'
-    });
-    return { statusCode: 400 };
-  }
-  
-  const { sessionCode: inputSessionCode, playerName, isSpectator = false } = body;
-  
-  try {
-    // Validate input
-    if (!playerName) {
-      console.log('❌ Missing player name');
-      await sendToConnection(connectionId, {
-        type: 'error',
-        message: 'Player name is required'
-      });
-      return { statusCode: 400 };
-    }
-    
-    if (playerName.length > 20) {
-      console.log('❌ Player name too long:', playerName.length);
-      await sendToConnection(connectionId, {
-        type: 'error',
-        message: 'Player name must be 20 characters or less'
-      });
-      return { statusCode: 400 };
-    }
-    
-    // Get or create session
-    const sessionCode = inputSessionCode || generateSessionCode();
-    console.log('🔍 Looking for session:', sessionCode);
-    
-    let session = await getSession(sessionCode);
-    
-    if (!session) {
-      console.log('📝 Creating new session:', sessionCode);
-      session = await createSession(sessionCode);
-      console.log('✅ New session created');
-    } else {
-      console.log('✅ Found existing session with', Object.keys(session.players || {}).length, 'players');
-    }
-    
-    // Check if player name already exists
-    if (session.players && session.players[playerName]) {
-      console.log('❌ Player name already taken:', playerName);
-      await sendToConnection(connectionId, {
-        type: 'error',
-        message: 'Player name "' + playerName + '" is already taken in this session'
-      });
-      return { statusCode: 400 };
-    }
-    
-    // Add player to session
-    const updatedPlayers = {
-      ...(session.players || {}),
-      [playerName]: {
-        hasVoted: false,
-        vote: null,
-        isSpectator: isSpectator,
-        joinedAt: new Date().toISOString()
-      }
-    };
-    
-    console.log('👥 Adding player to session. Total players will be:', Object.keys(updatedPlayers).length);
-    
-    // Update session
-    session = await updateSession(sessionCode, {
-      players: updatedPlayers
-    });
-    
-    if (!session) {
-      throw new Error('Failed to update session');
-    }
-    
-    // Store connection
-    await storeConnection(connectionId, sessionCode, playerName, isSpectator);
-    
-    console.log('✅ Player', playerName, 'joined session', sessionCode, 'as', isSpectator ? 'Spectator' : 'Voter');
-    
-    // Send success response to joining player
-    const joinResponse = {
-      type: 'joinedSession',
-      sessionCode: sessionCode,
-      playerName: playerName,
-      isSpectator: isSpectator,
-      shareUrl: (process.env.FRONTEND_URL || 'http://localhost:8080') + '?session=' + sessionCode
-    };
-    
-    console.log('📤 Sending join confirmation to', playerName);
-    await sendToConnection(connectionId, joinResponse);
-    
-    // Broadcast updated state to all players in session
-    const sessionUpdate = {
-      type: 'sessionUpdate',
-      state: {
-        players: session.players,
-        votesRevealed: session.votesRevealed || false,
-        hasConsensus: checkConsensus(session)
-      }
-    };
-    
-    console.log('📡 Broadcasting session update to all players');
-    await broadcastToSession(sessionCode, sessionUpdate);
-    
-    // Debug current state
-    debugState();
-    
-    return { statusCode: 200 };
-    
-  } catch (error) {
-    console.error('❌ Error in joinSession:', error);
-    await sendToConnection(connectionId, {
-      type: 'error',
-      message: 'Failed to join session: ' + error.message
-    });
-    return { statusCode: 500 };
-  }
-};
-
-// Cast vote handler
-exports.castVote = async (event) => {
-  const connectionId = event.requestContext.connectionId;
-  console.log('🗳️ Cast vote handler called for connection:', connectionId);
-  
-  let body;
-  try {
-    body = JSON.parse(event.body);
-  } catch (error) {
-    console.error('❌ Invalid JSON in vote request');
-    await sendToConnection(connectionId, {
-      type: 'error',
-      message: 'Invalid vote format'
-    });
-    return { statusCode: 400 };
-  }
-  
-  const { vote } = body;
-  console.log('🗳️ Vote value:', vote);
-  
-  try {
-    // Get connection info
-    const connection = await getConnection(connectionId);
+    const connection = await getConnection(socket.id);
     if (!connection) {
-      console.log('❌ Connection not found:', connectionId);
-      await sendToConnection(connectionId, {
-        type: 'error',
+      console.log('❌ Connection not found:', socket.id);
+      socket.emit('error', {
         message: 'Connection not found. Please rejoin the session.'
       });
-      return { statusCode: 400 };
+      return;
     }
     
     console.log('👤 Vote from player:', connection.playerName, 'in session:', connection.sessionCode);
     
     if (connection.isSpectator) {
       console.log('❌ Spectator tried to vote:', connection.playerName);
-      await sendToConnection(connectionId, {
-        type: 'error',
+      socket.emit('error', {
         message: 'Spectators cannot vote'
       });
-      return { statusCode: 400 };
+      return;
     }
     
     // Validate vote
     const validVotes = [1, 2, 3, 5, 8, 13];
-    if (!validVotes.includes(vote)) {
-      console.log('❌ Invalid vote value:', vote);
-      await sendToConnection(connectionId, {
-        type: 'error',
+    if (!validVotes.includes(data.vote)) {
+      console.log('❌ Invalid vote value:', data.vote);
+      socket.emit('error', {
         message: 'Invalid vote value. Must be: 1, 2, 3, 5, 8, or 13'
       });
-      return { statusCode: 400 };
+      return;
     }
     
     // Update session with vote
     const session = await getSession(connection.sessionCode);
     if (!session) {
       console.log('❌ Session not found:', connection.sessionCode);
-      await sendToConnection(connectionId, {
-        type: 'error',
+      socket.emit('error', {
         message: 'Session not found'
       });
-      return { statusCode: 400 };
+      return;
     }
     
+    // FIXED: Allow re-voting - just update the vote, don't check consensus state
     const updatedPlayers = {
       ...session.players,
       [connection.playerName]: {
         ...session.players[connection.playerName],
         hasVoted: true,
-        vote: vote
+        vote: data.vote
       }
     };
     
@@ -304,20 +80,25 @@ exports.castVote = async (event) => {
     
     console.log('📊 Voting progress:', votedCount, '/', nonSpectators.length, 'players voted');
     
+    // FIXED: Don't automatically reveal votes if they were already revealed
+    // Only reveal if all voted AND votes weren't already revealed
+    const shouldRevealVotes = allVoted && !session.votesRevealed;
+    
     const updatedSession = await updateSession(connection.sessionCode, {
       players: updatedPlayers,
-      votesRevealed: allVoted || session.votesRevealed
+      votesRevealed: shouldRevealVotes || session.votesRevealed
     });
     
-    console.log('✅ Vote recorded for', connection.playerName + ':', vote);
+    console.log('✅ Vote recorded for', connection.playerName + ':', data.vote);
     
-    if (allVoted) {
+    if (shouldRevealVotes) {
       console.log('🎉 All players have voted! Revealing votes...');
+    } else if (session.votesRevealed) {
+      console.log('🔄 Vote updated during re-voting phase');
     }
     
-    // Broadcast update to all players
-    await broadcastToSession(connection.sessionCode, {
-      type: 'sessionUpdate',
+    // Broadcast update to all players in the session
+    socket.to(connection.sessionCode).emit('sessionUpdate', {
       state: {
         players: updatedSession.players,
         votesRevealed: updatedSession.votesRevealed,
@@ -325,52 +106,53 @@ exports.castVote = async (event) => {
       }
     });
     
-    return { statusCode: 200 };
+    // Also send to the voter
+    socket.emit('sessionUpdate', {
+      state: {
+        players: updatedSession.players,
+        votesRevealed: updatedSession.votesRevealed,
+        hasConsensus: checkConsensus(updatedSession)
+      }
+    });
     
   } catch (error) {
     console.error('❌ Error in castVote:', error);
-    await sendToConnection(connectionId, {
-      type: 'error',
+    socket.emit('error', {
       message: 'Failed to cast vote: ' + error.message
     });
-    return { statusCode: 500 };
   }
 };
 
-// Reset votes handler
-exports.resetVotes = async (event) => {
-  const connectionId = event.requestContext.connectionId;
-  console.log('🔄 Reset votes handler called for connection:', connectionId);
+// Reset votes handler - FIXED: Allow reset even after consensus
+exports.handleResetVotes = async (socket) => {
+  console.log('🔄 Reset votes event from', socket.id);
   
   try {
-    const connection = await getConnection(connectionId);
+    const connection = await getConnection(socket.id);
     if (!connection) {
-      console.log('❌ Connection not found:', connectionId);
-      await sendToConnection(connectionId, {
-        type: 'error',
+      console.log('❌ Connection not found:', socket.id);
+      socket.emit('error', {
         message: 'Connection not found'
       });
-      return { statusCode: 400 };
+      return;
     }
     
     if (!connection.isSpectator) {
       console.log('❌ Non-spectator tried to reset:', connection.playerName);
-      await sendToConnection(connectionId, {
-        type: 'error',
+      socket.emit('error', {
         message: 'Only spectators can reset votes'
       });
-      return { statusCode: 400 };
+      return;
     }
     
     // Reset all votes in session
     const session = await getSession(connection.sessionCode);
     if (!session) {
       console.log('❌ Session not found:', connection.sessionCode);
-      await sendToConnection(connectionId, {
-        type: 'error',
+      socket.emit('error', {
         message: 'Session not found'
       });
-      return { statusCode: 400 };
+      return;
     }
     
     const resetPlayers = {};
@@ -384,18 +166,17 @@ exports.resetVotes = async (event) => {
     
     await updateSession(connection.sessionCode, {
       players: resetPlayers,
-      votesRevealed: false
+      votesRevealed: false  // Always reset votes revealed state
     });
     
     console.log('✅ Votes reset by spectator', connection.playerName, 'in session', connection.sessionCode);
     
-    // Broadcast reset to all players
-    await broadcastToSession(connection.sessionCode, {
-      type: 'votesReset'
-    });
+    // Broadcast reset notification to all players
+    socket.to(connection.sessionCode).emit('votesReset');
+    socket.emit('votesReset');
     
-    await broadcastToSession(connection.sessionCode, {
-      type: 'sessionUpdate',
+    // Broadcast updated session state
+    socket.to(connection.sessionCode).emit('sessionUpdate', {
       state: {
         players: resetPlayers,
         votesRevealed: false,
@@ -403,14 +184,133 @@ exports.resetVotes = async (event) => {
       }
     });
     
-    return { statusCode: 200 };
+    socket.emit('sessionUpdate', {
+      state: {
+        players: resetPlayers,
+        votesRevealed: false,
+        hasConsensus: false
+      }
+    });
     
   } catch (error) {
     console.error('❌ Error in resetVotes:', error);
-    await sendToConnection(connectionId, {
-      type: 'error',
+    socket.emit('error', {
       message: 'Failed to reset votes: ' + error.message
     });
-    return { statusCode: 500 };
+  }
+};
+
+// Join session handler with enhanced logging
+exports.handleJoinSession = async (socket, data) => {
+  console.log('🎯 Join session event:', data);
+  
+  try {
+    const { sessionCode, playerName, isSpectator } = data;
+    
+    // Validation
+    if (!sessionCode || !playerName) {
+      socket.emit('error', { message: 'Session code and player name are required' });
+      return;
+    }
+    
+    if (playerName.length > 20) {
+      socket.emit('error', { message: 'Player name must be 20 characters or less' });
+      return;
+    }
+    
+    // Get or create session
+    let session = await getSession(sessionCode);
+    
+    if (!session) {
+      // Create new session
+      session = {
+        sessionCode,
+        players: {},
+        votesRevealed: false,
+        createdAt: new Date().toISOString()
+      };
+      
+      console.log('🆕 Creating new session:', sessionCode);
+    }
+    
+    // Check if player name already exists
+    if (session.players[playerName]) {
+      socket.emit('error', { 
+        message: `Player name "${playerName}" is already taken in this session` 
+      });
+      return;
+    }
+    
+    // Add player to session
+    session.players[playerName] = {
+      hasVoted: false,
+      vote: null,
+      isSpectator: isSpectator || false,
+      joinedAt: new Date().toISOString()
+    };
+    
+    // Update session
+    await updateSession(sessionCode, session);
+    
+    // Store connection info
+    await storeConnection(socket.id, sessionCode, playerName, isSpectator || false);
+    
+    // Join socket room
+    socket.join(sessionCode);
+    
+    console.log(`✅ ${playerName} joined session ${sessionCode} as ${isSpectator ? 'Spectator' : 'Player'}`);
+    
+    // Send success response to joining player
+    socket.emit('sessionJoined', {
+      sessionCode,
+      playerName,
+      isSpectator: isSpectator || false,
+      shareUrl: `${process.env.CLIENT_URL || 'http://localhost:3000'}?session=${sessionCode}`
+    });
+    
+    // Broadcast updated session state to all players
+    const updatedSession = await getSession(sessionCode);
+    socket.to(sessionCode).emit('sessionUpdate', {
+      state: {
+        players: updatedSession.players,
+        votesRevealed: updatedSession.votesRevealed,
+        hasConsensus: checkConsensus(updatedSession)
+      }
+    });
+    
+    socket.emit('sessionUpdate', {
+      state: {
+        players: updatedSession.players,
+        votesRevealed: updatedSession.votesRevealed,
+        hasConsensus: checkConsensus(updatedSession)
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error in joinSession:', error);
+    socket.emit('error', {
+      message: 'Failed to join session: ' + error.message
+    });
+  }
+};
+
+// Handle disconnect with cleanup
+exports.handleDisconnect = async (socket) => {
+  console.log('👋 Player disconnected:', socket.id);
+  
+  try {
+    const connection = await getConnection(socket.id);
+    if (connection) {
+      console.log(`🔌 ${connection.playerName} disconnected from session ${connection.sessionCode}`);
+      
+      // Leave socket room
+      socket.leave(connection.sessionCode);
+      
+      // Remove connection but keep player in session for reconnection
+      // In a production app, you might want to implement a timeout
+      // before removing the player completely
+    }
+  } catch (error) {
+    console.error('❌ Error handling disconnect:', error);
   }
 };
