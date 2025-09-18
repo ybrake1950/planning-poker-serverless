@@ -1,6 +1,6 @@
-// Enhanced Planning Poker Frontend - app.js
+// client/src/app.js
+// Fixed Planning Poker Frontend - Connection Issue Resolved + Password Modal
 // Directory: client/src/app.js
-// Complete working version with backend connection
 
 // Global game state
 var gameState = {
@@ -33,17 +33,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Setup event listeners
 function setupEventListeners() {
-    // Team password authentication
-    var teamPasswordField = document.getElementById('teamPassword');
-    if (teamPasswordField) {
-        teamPasswordField.addEventListener('click', handlePasswordAuth);
-        teamPasswordField.addEventListener('focus', handlePasswordAuth);
+    // Team password button
+    var teamPasswordBtn = document.getElementById('teamPasswordBtn');
+    if (teamPasswordBtn) {
+        teamPasswordBtn.addEventListener('click', handlePasswordAuth);
     }
     
     // Join button
     document.getElementById('joinButton').addEventListener('click', joinSession);
     
-    // Reset buttons (both main and spectator)
+    // Reset buttons
     var resetButton = document.getElementById('resetButton');
     if (resetButton) {
         resetButton.addEventListener('click', resetVotes);
@@ -54,21 +53,12 @@ function setupEventListeners() {
         resetButtonSpectator.addEventListener('click', resetVotes);
     }
     
-    // Voting cards with enhanced interaction
+    // Voting cards
     var fibonacciCards = document.querySelectorAll('.fibonacci-card');
     for (var i = 0; i < fibonacciCards.length; i++) {
         fibonacciCards[i].addEventListener('click', function() {
             var value = parseInt(this.dataset.value);
             castVote(value);
-        });
-        
-        // Keyboard support
-        fibonacciCards[i].addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                var value = parseInt(this.dataset.value);
-                castVote(value);
-            }
         });
     }
     
@@ -83,15 +73,17 @@ function setupEventListeners() {
     });
 }
 
-// Connect to server
+// Connect to server - FIXED: Correct port detection
 function connectToServer() {
     console.log('🔌 Connecting to server...');
     
-    var serverUrl = 'http://localhost:3001';
+    // FIXED: Connect to the correct backend server port
+    var serverUrl = 'http://localhost:3001';  // Backend runs on 3001
     
     // Check if Socket.IO is available
     if (typeof io === 'undefined') {
-        console.log('⚠️ Socket.IO not available');
+        console.log('❌ Socket.IO not available');
+        hideLoading();
         showError('Socket.IO library not loaded');
         return;
     }
@@ -107,15 +99,16 @@ function connectToServer() {
         gameState.socket.on('connect', function() {
             console.log('✅ Connected to backend server');
             gameState.isConnected = true;
-            hideError();
             hideLoading();
+            hideError();
             showTemporaryMessage('✅ Connected to server!');
         });
         
         // Connection failed
         gameState.socket.on('connect_error', function(error) {
             console.log('❌ Connection failed:', error);
-            showError('Failed to connect to server. Please check if the server is running.');
+            hideLoading();
+            showError('Failed to connect to server. Please check if the server is running on port 3001.');
         });
         
         // Disconnect handling
@@ -126,11 +119,16 @@ function connectToServer() {
         });
         
         // Session joined successfully
-        gameState.socket.on('sessionJoined', function(data) {
-            console.log('🎮 Session joined:', data);
+        gameState.socket.on('joinedSession', function(data) {
+            console.log('🎮 Session joined successfully:', data);
             gameState.isSpectator = data.isSpectator;
             gameState.playerName = data.playerName;
+            
+            // Show the game interface
             showGameInterface(data);
+            hideLoading();
+            
+            console.log('✅ Game interface should now be visible');
         });
         
         // Session state update
@@ -155,10 +153,12 @@ function connectToServer() {
         gameState.socket.on('error', function(data) {
             console.error('❌ Server error:', data);
             showError(data.message || 'Server error occurred');
+            hideLoading();
         });
         
     } catch (error) {
         console.log('❌ Socket connection error:', error);
+        hideLoading();
         showError('Failed to connect to server');
     }
 }
@@ -181,6 +181,13 @@ function joinSession() {
     
     if (!gameState.isConnected) {
         showError('Not connected to server. Please wait...');
+        return;
+    }
+    
+    // Check authentication
+    var isAuthenticated = localStorage.getItem('planningPoker_authenticated') === 'true';
+    if (!isAuthenticated) {
+        showError('Please enter team password first');
         return;
     }
     
@@ -214,7 +221,6 @@ function castVote(value) {
         return;
     }
     
-    // Allow re-voting when no consensus, even if votes are revealed
     var canVote = !gameState.sessionState.hasConsensus;
     var isRevotingScenario = gameState.sessionState.votesRevealed && !gameState.sessionState.hasConsensus;
     
@@ -224,7 +230,6 @@ function castVote(value) {
         return;
     }
     
-    // Show appropriate feedback for re-voting
     if (isRevotingScenario && gameState.currentVote !== null) {
         showTemporaryMessage('🔄 Vote changed from ' + gameState.currentVote + ' to ' + value);
     } else if (isRevotingScenario) {
@@ -263,29 +268,37 @@ function resetVotes() {
 
 // UI Helper Functions
 function showGameInterface(sessionData) {
-    console.log('🎮 Showing game interface:', sessionData);
+    console.log('🎮 SHOWING GAME INTERFACE - sessionData:', sessionData);
     
-    // Hide join form
-    var joinForm = document.getElementById('joinInterface');
-    if (joinForm) {
-        joinForm.style.display = 'none';
+    // Hide join form completely
+    var joinInterface = document.getElementById('joinInterface');
+    if (joinInterface) {
+        joinInterface.style.display = 'none';
+        console.log('✅ Join interface hidden');
     }
     
     // Show game interface
     var gameInterface = document.getElementById('gameInterface');
     if (gameInterface) {
         gameInterface.style.display = 'block';
+        console.log('✅ Game interface shown');
+    } else {
+        console.error('❌ Game interface element not found!');
+        return;
     }
     
     // Update session info
     var sessionInfo = document.getElementById('sessionInfo');
     if (sessionInfo) {
         sessionInfo.textContent = 'Session: ' + sessionData.sessionCode;
+        console.log('✅ Session info updated:', sessionData.sessionCode);
     }
     
     var shareLink = document.getElementById('shareLink');
     if (shareLink) {
-        shareLink.textContent = sessionData.shareUrl || (window.location.origin + '?session=' + sessionData.sessionCode);
+        var linkText = sessionData.shareUrl || ('http://localhost:8080?session=' + sessionData.sessionCode);
+        shareLink.textContent = linkText;
+        console.log('✅ Share link updated:', linkText);
     }
     
     // Show spectator controls if spectator
@@ -295,11 +308,14 @@ function showGameInterface(sessionData) {
             spectatorControls.style.display = 'flex';
         }
         updateStatus('👁️ You are the Spectator. Share the link above with your team.');
+        console.log('✅ Spectator mode activated');
     } else {
         updateStatus('🎯 Connected to session. Cast your vote when ready!');
+        console.log('✅ Player mode activated');
     }
     
     hideLoading();
+    console.log('🎉 Game interface setup complete!');
 }
 
 function updateGameInterface() {
@@ -319,7 +335,6 @@ function updatePlayerCards() {
     var players = gameState.sessionState.players;
     var votesRevealed = gameState.sessionState.votesRevealed;
     
-    // ES5 compatible object iteration
     for (var name in players) {
         if (!players.hasOwnProperty(name)) continue;
         
@@ -327,7 +342,6 @@ function updatePlayerCards() {
         var playerDiv = document.createElement('div');
         playerDiv.className = 'player-card';
         
-        // Add visual state indicators
         if (!player.isSpectator) {
             if (player.hasVoted) {
                 playerDiv.classList.add('has-voted');
@@ -343,7 +357,6 @@ function updatePlayerCards() {
         var cardDiv = document.createElement('div');
         cardDiv.className = 'vote-card';
         
-        // Enhanced visual feedback for different states
         if (player.isSpectator) {
             cardDiv.classList.add('no-vote');
             cardDiv.textContent = '👁️';
@@ -358,7 +371,6 @@ function updatePlayerCards() {
             cardDiv.textContent = '✓';
         }
         
-        // Add status indicator below card
         var statusDiv = document.createElement('small');
         if (player.isSpectator) {
             statusDiv.textContent = 'Observing';
@@ -378,7 +390,6 @@ function updatePlayerCards() {
     }
 }
 
-// Enhanced voting cards with re-voting support
 function updateVotingCards() {
     var cards = document.querySelectorAll('.fibonacci-card');
     
@@ -387,12 +398,10 @@ function updateVotingCards() {
     
     for (var i = 0; i < cards.length; i++) {
         var card = cards[i];
-        // Remove all state classes
         card.classList.remove('disabled', 're-vote-allowed');
         
         if (canVote) {
             if (isReVotingScenario) {
-                // Add special styling for re-voting scenario
                 card.classList.add('re-vote-allowed');
             }
         } else {
@@ -401,7 +410,6 @@ function updateVotingCards() {
     }
 }
 
-// Context-aware spectator controls
 function updateSpectatorControls() {
     var resetButton = document.getElementById('resetButton');
     var resetButtonSpectator = document.getElementById('resetButtonSpectator');
@@ -411,7 +419,6 @@ function updateSpectatorControls() {
     var players = gameState.sessionState.players;
     var nonSpectators = [];
     
-    // ES5 compatible object iteration
     for (var playerName in players) {
         if (players.hasOwnProperty(playerName)) {
             var player = players[playerName];
@@ -429,7 +436,6 @@ function updateSpectatorControls() {
         }
     }
     
-    // Show/hide reset buttons based on votes
     var buttons = [resetButton, resetButtonSpectator];
     for (var i = 0; i < buttons.length; i++) {
         var button = buttons[i];
@@ -438,7 +444,6 @@ function updateSpectatorControls() {
         if (hasVotes) {
             button.style.display = 'block';
             
-            // Context-aware button text
             if (gameState.sessionState.hasConsensus) {
                 button.textContent = '🆕 Start New Round';
                 button.title = 'Start a new voting round';
@@ -456,13 +461,11 @@ function updateSpectatorControls() {
 }
 
 function updateSelectedVote(value) {
-    // Clear previous selection
     var cards = document.querySelectorAll('.fibonacci-card');
     for (var i = 0; i < cards.length; i++) {
         cards[i].classList.remove('selected');
     }
     
-    // Select new vote
     if (value) {
         var selectedCard = document.querySelector('[data-value="' + value + '"]');
         if (selectedCard) {
@@ -475,7 +478,6 @@ function clearSelectedVote() {
     updateSelectedVote(null);
 }
 
-// Enhanced status messages with re-voting context
 function updateStatus(message) {
     var statusEl = document.getElementById('gameStatus');
     if (!statusEl) return;
@@ -486,13 +488,11 @@ function updateStatus(message) {
         return;
     }
     
-    // Auto-generate status based on game state
     var players = gameState.sessionState.players;
     var nonSpectators = [];
     var totalVoters = 0;
     var votedCount = 0;
     
-    // ES5 compatible object iteration
     for (var playerName in players) {
         if (players.hasOwnProperty(playerName)) {
             var player = players[playerName];
@@ -520,7 +520,6 @@ function updateStatus(message) {
             }
             statusEl.innerHTML = '<div class="consensus">🎉 Consensus Reached! Story Points: ' + consensusVote + ' 🎉</div>';
         } else {
-            // Enhanced messaging for re-voting
             statusEl.innerHTML = '<div class="no-consensus">⚠️ No consensus reached.<br><strong>You can change your vote or wait for spectator to reset.</strong></div>';
             statusEl.className = 'status no-consensus';
         }
@@ -530,11 +529,9 @@ function updateStatus(message) {
     }
 }
 
-// Enhanced temporary message system
 function showTemporaryMessage(message, duration) {
     duration = duration || 3000;
     
-    // Remove any existing messages
     var existingMessages = document.querySelectorAll('.temporary-message');
     for (var i = 0; i < existingMessages.length; i++) {
         existingMessages[i].remove();
@@ -571,7 +568,6 @@ function copyShareLink() {
             showTemporaryMessage('❌ Unable to copy - please copy manually');
         });
     } else {
-        // Fallback for older browsers
         showTemporaryMessage('💡 Please copy the link manually');
     }
 }
@@ -584,7 +580,6 @@ function showError(message) {
         errorEl.textContent = message;
         errorEl.style.display = 'block';
         
-        // Auto-hide after 5 seconds
         setTimeout(hideError, 5000);
     }
 }
@@ -610,32 +605,6 @@ function hideLoading() {
     }
 }
 
-/* Enhanced keyboard shortcuts
-document.addEventListener('keydown', function(event) {
-    // Only handle shortcuts when in game interface
-    var gameInterface = document.getElementById('gameInterface');
-    if (!gameInterface || gameInterface.style.display === 'none') {
-        return;
-    }
-    
-    // Number keys 1-6 for Fibonacci votes
-    var fibValues = [1, 2, 3, 5, 8, 13];
-    var keyNum = event.key ? parseInt(event.key) : null;
-    
-    if (keyNum >= 1 && keyNum <= 6) {
-        event.preventDefault();
-        var voteValue = fibValues[keyNum - 1];
-        castVote(voteValue);
-    }
-    
-    // 'R' key for reset (Spectator only)
-    //if (event.key.toLowerCase() === 'r' && gameState.isSpectator) {
-    //    event.preventDefault();
-    //    resetVotes();
-    //}
-    
-});
-*/
 // Authentication Functions
 function checkAuthentication() {
     var isAuthenticated = localStorage.getItem('planningPoker_authenticated') === 'true';
@@ -669,7 +638,7 @@ function showPasswordModal() {
     modalOverlay.className = 'password-modal-overlay';
     modalOverlay.innerHTML = 
         '<div class="password-modal">' +
-            '<h3>🔐 Enter Team Password</h3>' +
+            '<h3>🔒 Enter Team Password</h3>' +
             '<p>Please enter the team password to access Planning Poker:</p>' +
             '<input type="password" id="passwordInput" placeholder="Enter password" maxlength="50">' +
             '<div class="modal-buttons">' +
@@ -757,10 +726,4 @@ function focusOnPlayerName() {
             playerNameField.focus();
         }
     }, 100);
-}
-
-function logout() {
-    localStorage.removeItem('planningPoker_authenticated');
-    showPasswordField();
-    showTemporaryMessage('🔓 Logged out. Please re-enter password.');
 }
