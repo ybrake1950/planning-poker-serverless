@@ -84,77 +84,235 @@ function setupEventListeners() {
     });
 }
 
-// Connect to server via Socket.IO
+// Test Mode for when backend is not available
+function enableTestMode() {
+    console.log('🧪 Enabling test mode - mock backend functionality');
+    gameState.isConnected = true;
+    
+    // Hide loading and show success
+    setTimeout(function() {
+        hideLoading();
+        showTemporaryMessage('🧪 Test mode enabled - All UI features active!');
+    }, 1000);
+    
+    // Create mock socket object
+    gameState.socket = {
+        emit: function(event, data) {
+            console.log('🧪 Mock socket emit:', event, data);
+            
+            // Handle joinSession
+            if (event === 'joinSession') {
+                setTimeout(function() {
+                    var mockSessionData = {
+                        sessionCode: data.sessionCode || generateSessionCode(),
+                        playerName: data.playerName,
+                        isSpectator: data.isSpectator || false,
+                        shareUrl: window.location.origin + '?session=' + (data.sessionCode || 'MOCK123')
+                    };
+                    
+                    // Set game state
+                    gameState.isSpectator = mockSessionData.isSpectator;
+                    gameState.playerName = mockSessionData.playerName;
+                    
+                    // Show game interface
+                    showGameInterface(mockSessionData);
+                    
+                    // Create mock players for realistic testing
+                    var mockPlayers = {};
+                    mockPlayers[data.playerName] = { 
+                        hasVoted: false, 
+                        vote: null, 
+                        isSpectator: data.isSpectator || false
+                    };
+                    
+                    // Add some other mock players based on role
+                    if (data.isSpectator) {
+                        mockPlayers['Alice'] = { hasVoted: true, vote: 5, isSpectator: false };
+                        mockPlayers['Bob'] = { hasVoted: true, vote: 8, isSpectator: false };
+                        mockPlayers['Charlie'] = { hasVoted: false, vote: null, isSpectator: false };
+                    } else {
+                        mockPlayers['Spectator'] = { hasVoted: false, vote: null, isSpectator: true };
+                        mockPlayers['Alice'] = { hasVoted: true, vote: 5, isSpectator: false };
+                    }
+                    
+                    // Set session state
+                    gameState.sessionState = {
+                        players: mockPlayers,
+                        votesRevealed: false,
+                        hasConsensus: false
+                    };
+                    
+                    updateGameInterface();
+                    showTemporaryMessage('✅ Mock session created successfully!');
+                }, 800);
+            }
+            
+            // Handle castVote
+            if (event === 'castVote') {
+                setTimeout(function() {
+                    gameState.currentVote = data.vote;
+                    
+                    // Update player's vote in mock state
+                    if (gameState.sessionState.players[gameState.playerName]) {
+                        gameState.sessionState.players[gameState.playerName].hasVoted = true;
+                        gameState.sessionState.players[gameState.playerName].vote = data.vote;
+                    }
+                    
+                    // Check if all non-spectators have voted
+                    var nonSpectators = [];
+                    for (var playerName in gameState.sessionState.players) {
+                        if (gameState.sessionState.players.hasOwnProperty(playerName)) {
+                            var player = gameState.sessionState.players[playerName];
+                            if (!player.isSpectator) {
+                                nonSpectators.push(player);
+                            }
+                        }
+                    }
+                    
+                    var allVoted = nonSpectators.length > 0 && nonSpectators.every(function(p) { return p.hasVoted; });
+                    
+                    if (allVoted) {
+                        gameState.sessionState.votesRevealed = true;
+                        
+                        // Check for consensus
+                        var votes = nonSpectators.map(function(p) { return p.vote; });
+                        var firstVote = votes[0];
+                        gameState.sessionState.hasConsensus = votes.every(function(v) { return v === firstVote; });
+                        
+                        if (gameState.sessionState.hasConsensus) {
+                            showTemporaryMessage('🎉 Consensus reached! Story points: ' + firstVote);
+                        } else {
+                            showTemporaryMessage('⚠️ No consensus - you can change your vote!');
+                        }
+                    } else {
+                        showTemporaryMessage('✅ Vote recorded: ' + data.vote);
+                    }
+                    
+                    updateGameInterface();
+                }, 400);
+            }
+            
+            // Handle resetVotes
+            if (event === 'resetVotes') {
+                setTimeout(function() {
+                    // Reset all player votes
+                    for (var playerName in gameState.sessionState.players) {
+                        if (gameState.sessionState.players.hasOwnProperty(playerName)) {
+                            gameState.sessionState.players[playerName].hasVoted = false;
+                            gameState.sessionState.players[playerName].vote = null;
+                        }
+                    }
+                    
+                    gameState.sessionState.votesRevealed = false;
+                    gameState.sessionState.hasConsensus = false;
+                    gameState.currentVote = null;
+                    
+                    clearSelectedVote();
+                    updateGameInterface();
+                    showTemporaryMessage('🔄 Votes reset - new round started!');
+                }, 300);
+            }
+        }
+    };
+}
+
+// Modified connectToServer function with test mode fallback
+// REPLACE your existing connectToServer function with this enhanced version:
+
 function connectToServer() {
     console.log('🔌 Connecting to server...');
     
-    // Use current domain for production, localhost for development
     var serverUrl = window.location.hostname === 'localhost' 
         ? 'http://localhost:3001' 
         : window.location.origin;
     
-    // Check if io is available (Socket.IO)
+    // Check if Socket.IO is available
     if (typeof io === 'undefined') {
-        console.log('⚠️ Socket.IO not available - running in test mode');
-        gameState.isConnected = false;
-        showTemporaryMessage('⚠️ Running in test mode - no server connection');
+        console.log('⚠️ Socket.IO not available - enabling test mode');
+        enableTestMode();
         return;
     }
     
-    gameState.socket = io(serverUrl, {
-        transports: ['websocket', 'polling'],
-        upgrade: true,
-        rememberUpgrade: true
-    });
+    // Set up connection timeout for test mode fallback
+    var connectionTimeout = setTimeout(function() {
+        console.log('⚠️ Backend connection timeout - falling back to test mode');
+        enableTestMode();
+    }, 3000); // 3 second timeout
     
-    // Connection established
-    gameState.socket.on('connect', function() {
-        console.log('✅ Connected to server');
-        gameState.isConnected = true;
-        hideError();
-        hideLoading();
-    });
-    
-    // Connection failed
-    gameState.socket.on('disconnect', function() {
-        console.log('❌ Disconnected from server');
-        gameState.isConnected = false;
-        showError('Connection lost. Trying to reconnect...');
-    });
-    
-    // Session joined successfully
-    gameState.socket.on('sessionJoined', function(data) {
-        console.log('🎮 Session joined:', data);
-        gameState.isSpectator = data.isSpectator;
-        gameState.playerName = data.playerName;
-        showGameInterface(data);
-        updateGameInterface();
-    });
-    
-    // Session state update
-    gameState.socket.on('sessionUpdate', function(data) {
-        console.log('📊 Session update received:', data);
+    try {
+        gameState.socket = io(serverUrl, {
+            transports: ['websocket', 'polling'],
+            upgrade: true,
+            rememberUpgrade: true,
+            timeout: 3000
+        });
         
-        if (data.state) {
-            gameState.sessionState = Object.assign(gameState.sessionState, data.state);
+        // Connection established
+        gameState.socket.on('connect', function() {
+            clearTimeout(connectionTimeout);
+            console.log('✅ Connected to real backend server');
+            gameState.isConnected = true;
+            hideError();
+            hideLoading();
+            showTemporaryMessage('✅ Connected to backend server!');
+        });
+        
+        // Connection failed
+        gameState.socket.on('connect_error', function(error) {
+            clearTimeout(connectionTimeout);
+            console.log('❌ Backend connection failed:', error);
+            console.log('🧪 Switching to test mode...');
+            enableTestMode();
+        });
+        
+        // Connection failed
+        gameState.socket.on('disconnect', function() {
+            console.log('❌ Disconnected from server');
+            gameState.isConnected = false;
+            showError('Connection lost. Trying to reconnect...');
+        });
+        
+        // Session joined successfully
+        gameState.socket.on('sessionJoined', function(data) {
+            clearTimeout(connectionTimeout);
+            console.log('🎮 Session joined:', data);
+            gameState.isSpectator = data.isSpectator;
+            gameState.playerName = data.playerName;
+            showGameInterface(data);
             updateGameInterface();
-        }
-    });
-    
-    // Votes reset notification
-    gameState.socket.on('votesReset', function() {
-        console.log('🔄 Votes have been reset');
-        gameState.currentVote = null;
-        clearSelectedVote();
-        showTemporaryMessage('🔄 Votes reset - you can vote again!');
-    });
-    
-    // Error handling
-    gameState.socket.on('error', function(data) {
-        console.error('❌ Server error:', data);
-        showError(data.message || 'Server error occurred');
-        hideLoading();
-    });
+        });
+        
+        // Session state update
+        gameState.socket.on('sessionUpdate', function(data) {
+            console.log('📊 Session update received:', data);
+            
+            if (data.state) {
+                gameState.sessionState = Object.assign(gameState.sessionState, data.state);
+                updateGameInterface();
+            }
+        });
+        
+        // Votes reset notification
+        gameState.socket.on('votesReset', function() {
+            console.log('🔄 Votes have been reset');
+            gameState.currentVote = null;
+            clearSelectedVote();
+            showTemporaryMessage('🔄 Votes reset - you can vote again!');
+        });
+        
+        // Error handling
+        gameState.socket.on('error', function(data) {
+            console.error('❌ Server error:', data);
+            showError(data.message || 'Server error occurred');
+            hideLoading();
+        });
+        
+    } catch (error) {
+        clearTimeout(connectionTimeout);
+        console.log('❌ Socket.IO connection error:', error);
+        console.log('🧪 Enabling test mode due to connection error');
+        enableTestMode();
+    }
 }
 
 // Join or create session
@@ -689,10 +847,10 @@ document.addEventListener('keydown', function(event) {
     }
     
     // 'R' key for reset (Spectator only)
-    if (event.key.toLowerCase() === 'r' && gameState.isSpectator) {
-        event.preventDefault();
-        resetVotes();
-    }
+    //if (event.key.toLowerCase() === 'r' && gameState.isSpectator) {
+    //    event.preventDefault();
+    //    resetVotes();
+    //}
 });
 
 // Authentication Functions
@@ -774,7 +932,7 @@ function validatePassword() {
     var passwordError = document.getElementById('passwordError');
     
     // You can customize this password or make it configurable
-    var correctPassword = 'team2024'; // Change this to your desired password
+    var correctPassword = 'team'; // Change this to your desired password
     
     if (enteredPassword === correctPassword) {
         // Password correct
