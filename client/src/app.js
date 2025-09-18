@@ -1,12 +1,10 @@
-// Enhanced Planning Poker Frontend - app.js
+// Enhanced Planning Poker Frontend - app.js (ES5 Compatible)
 // Directory: Execute from client/src/ folder
-// Incorporates Enhancement 1, 2, and 3 from UI Enhancement Mockups:
-// - Enhancement 1: Improved Re-voting Interface with dynamic vote changing
-// - Enhancement 2: Smart Spectator Controls with context-aware reset button
-// - Enhancement 3: Enhanced Player Status Indicators with visual feedback
+// Fixed: Removed const declarations that cause parsing errors
+// Compatible with older JavaScript engines and strict mode
 
 // Global game state
-const gameState = {
+var gameState = {
     socket: null,
     isConnected: false,
     sessionState: {
@@ -23,12 +21,12 @@ const gameState = {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🎯 Planning Poker app initializing...');
     setupEventListeners();
-    checkAuthentication(); // Check if user needs to authenticate
+    checkAuthentication();
     connectToServer();
     
     // Check URL parameters for session joining
-    const urlParams = new URLSearchParams(window.location.search);
-    const sessionCode = urlParams.get('session');
+    var urlParams = new URLSearchParams(window.location.search);
+    var sessionCode = urlParams.get('session');
     if (sessionCode) {
         document.getElementById('sessionCode').value = sessionCode;
     }
@@ -37,7 +35,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // Setup event listeners
 function setupEventListeners() {
     // Team password authentication
-    const teamPasswordField = document.getElementById('teamPassword');
+    var teamPasswordField = document.getElementById('teamPassword');
     if (teamPasswordField) {
         teamPasswordField.addEventListener('click', handlePasswordAuth);
         teamPasswordField.addEventListener('focus', handlePasswordAuth);
@@ -47,32 +45,33 @@ function setupEventListeners() {
     document.getElementById('joinButton').addEventListener('click', joinSession);
     
     // Reset buttons (both main and spectator)
-    const resetButton = document.getElementById('resetButton');
+    var resetButton = document.getElementById('resetButton');
     if (resetButton) {
         resetButton.addEventListener('click', resetVotes);
     }
     
-    const resetButtonSpectator = document.getElementById('resetButtonSpectator');
+    var resetButtonSpectator = document.getElementById('resetButtonSpectator');
     if (resetButtonSpectator) {
         resetButtonSpectator.addEventListener('click', resetVotes);
     }
     
     // Voting cards with enhanced interaction
-    document.querySelectorAll('.fibonacci-card').forEach(card => {
-        card.addEventListener('click', function() {
-            const value = parseInt(this.dataset.value);
+    var fibonacciCards = document.querySelectorAll('.fibonacci-card');
+    for (var i = 0; i < fibonacciCards.length; i++) {
+        fibonacciCards[i].addEventListener('click', function() {
+            var value = parseInt(this.dataset.value);
             castVote(value);
         });
         
         // Keyboard support
-        card.addEventListener('keypress', function(e) {
+        fibonacciCards[i].addEventListener('keypress', function(e) {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                const value = parseInt(this.dataset.value);
+                var value = parseInt(this.dataset.value);
                 castVote(value);
             }
         });
-    });
+    }
     
     // Share link copy functionality
     document.getElementById('shareLink').addEventListener('click', copyShareLink);
@@ -90,9 +89,17 @@ function connectToServer() {
     console.log('🔌 Connecting to server...');
     
     // Use current domain for production, localhost for development
-    const serverUrl = window.location.hostname === 'localhost' 
+    var serverUrl = window.location.hostname === 'localhost' 
         ? 'http://localhost:3001' 
         : window.location.origin;
+    
+    // Check if io is available (Socket.IO)
+    if (typeof io === 'undefined') {
+        console.log('⚠️ Socket.IO not available - running in test mode');
+        gameState.isConnected = false;
+        showTemporaryMessage('⚠️ Running in test mode - no server connection');
+        return;
+    }
     
     gameState.socket = io(serverUrl, {
         transports: ['websocket', 'polling'],
@@ -101,7 +108,7 @@ function connectToServer() {
     });
     
     // Connection established
-    gameState.socket.on('connect', () => {
+    gameState.socket.on('connect', function() {
         console.log('✅ Connected to server');
         gameState.isConnected = true;
         hideError();
@@ -109,14 +116,14 @@ function connectToServer() {
     });
     
     // Connection failed
-    gameState.socket.on('disconnect', () => {
+    gameState.socket.on('disconnect', function() {
         console.log('❌ Disconnected from server');
         gameState.isConnected = false;
         showError('Connection lost. Trying to reconnect...');
     });
     
     // Session joined successfully
-    gameState.socket.on('sessionJoined', (data) => {
+    gameState.socket.on('sessionJoined', function(data) {
         console.log('🎮 Session joined:', data);
         gameState.isSpectator = data.isSpectator;
         gameState.playerName = data.playerName;
@@ -125,20 +132,17 @@ function connectToServer() {
     });
     
     // Session state update
-    gameState.socket.on('sessionUpdate', (data) => {
+    gameState.socket.on('sessionUpdate', function(data) {
         console.log('📊 Session update received:', data);
         
         if (data.state) {
-            gameState.sessionState = {
-                ...gameState.sessionState,
-                ...data.state
-            };
+            gameState.sessionState = Object.assign(gameState.sessionState, data.state);
             updateGameInterface();
         }
     });
     
     // Votes reset notification
-    gameState.socket.on('votesReset', () => {
+    gameState.socket.on('votesReset', function() {
         console.log('🔄 Votes have been reset');
         gameState.currentVote = null;
         clearSelectedVote();
@@ -146,7 +150,7 @@ function connectToServer() {
     });
     
     // Error handling
-    gameState.socket.on('error', (data) => {
+    gameState.socket.on('error', function(data) {
         console.error('❌ Server error:', data);
         showError(data.message || 'Server error occurred');
         hideLoading();
@@ -155,9 +159,9 @@ function connectToServer() {
 
 // Join or create session
 function joinSession() {
-    const playerName = document.getElementById('playerName').value.trim();
-    const sessionCode = document.getElementById('sessionCode').value.trim();
-    const isSpectator = document.getElementById('spectatorMode').checked;
+    var playerName = document.getElementById('playerName').value.trim();
+    var sessionCode = document.getElementById('sessionCode').value.trim();
+    var isSpectator = document.getElementById('spectatorMode').checked;
     
     if (!playerName) {
         showError('Please enter your name');
@@ -178,21 +182,21 @@ function joinSession() {
     hideError();
     
     // Determine if creating new session or joining existing
-    const finalSessionCode = sessionCode || generateSessionCode();
+    var finalSessionCode = sessionCode || generateSessionCode();
     
-    console.log(`🎯 ${sessionCode ? 'Joining' : 'Creating'} session: ${finalSessionCode} as ${isSpectator ? 'Spectator' : 'Player'}`);
+    console.log('🎯 ' + (sessionCode ? 'Joining' : 'Creating') + ' session: ' + finalSessionCode + ' as ' + (isSpectator ? 'Spectator' : 'Player'));
     
     // Send join request to server
     gameState.socket.emit('joinSession', {
         sessionCode: finalSessionCode,
-        playerName,
-        isSpectator
+        playerName: playerName,
+        isSpectator: isSpectator
     });
 }
 
 // ENHANCEMENT 1: Cast a vote with dynamic vote changing support
 function castVote(value) {
-    console.log(`🗳️ Vote button clicked: ${value}`);
+    console.log('🗳️ Vote button clicked: ' + value);
     
     if (!gameState.isConnected) {
         showError('Not connected to server');
@@ -205,8 +209,8 @@ function castVote(value) {
     }
     
     // ENHANCEMENT 1: Allow re-voting when no consensus, even if votes are revealed
-    const canVote = !gameState.sessionState.hasConsensus;
-    const isRevotingScenario = gameState.sessionState.votesRevealed && !gameState.sessionState.hasConsensus;
+    var canVote = !gameState.sessionState.hasConsensus;
+    var isRevotingScenario = gameState.sessionState.votesRevealed && !gameState.sessionState.hasConsensus;
     
     if (!canVote) {
         console.log('🚫 Voting disabled - consensus already reached');
@@ -216,14 +220,14 @@ function castVote(value) {
     
     // Show appropriate feedback for re-voting
     if (isRevotingScenario && gameState.currentVote !== null) {
-        showTemporaryMessage(`🔄 Vote changed from ${gameState.currentVote} to ${value}`);
+        showTemporaryMessage('🔄 Vote changed from ' + gameState.currentVote + ' to ' + value);
     } else if (isRevotingScenario) {
-        showTemporaryMessage(`🗳️ Vote cast: ${value} (re-voting round)`);
+        showTemporaryMessage('🗳️ Vote cast: ' + value + ' (re-voting round)');
     } else {
-        showTemporaryMessage(`✅ Vote recorded: ${value}`);
+        showTemporaryMessage('✅ Vote recorded: ' + value);
     }
     
-    console.log(`🗳️ Casting vote: ${value}${isRevotingScenario ? ' (re-voting)' : ''}`);
+    console.log('🗳️ Casting vote: ' + value + (isRevotingScenario ? ' (re-voting)' : ''));
     
     // Update local state and UI immediately for responsiveness
     gameState.currentVote = value;
@@ -235,7 +239,9 @@ function castVote(value) {
     }
     
     // Send vote to server
-    gameState.socket.emit('castVote', { vote: value });
+    if (gameState.socket) {
+        gameState.socket.emit('castVote', { vote: value });
+    }
 }
 
 // ENHANCEMENT 2: Smart spectator reset with context-aware behavior
@@ -253,16 +259,33 @@ function resetVotes() {
     }
     
     // ENHANCEMENT 2: Provide contextual feedback based on current state
-    const players = gameState.sessionState.players;
-    const nonSpectators = Object.entries(players).filter(([_, player]) => !player.isSpectator);
-    const hasVotes = nonSpectators.some(([_, player]) => player.hasVoted);
+    var players = gameState.sessionState.players;
+    var nonSpectators = [];
+    
+    // Convert object entries to array (ES5 compatible)
+    for (var playerName in players) {
+        if (players.hasOwnProperty(playerName)) {
+            var player = players[playerName];
+            if (!player.isSpectator) {
+                nonSpectators.push([playerName, player]);
+            }
+        }
+    }
+    
+    var hasVotes = false;
+    for (var i = 0; i < nonSpectators.length; i++) {
+        if (nonSpectators[i][1].hasVoted) {
+            hasVotes = true;
+            break;
+        }
+    }
     
     if (!hasVotes) {
         showTemporaryMessage('ℹ️ No votes to reset');
         return;
     }
     
-    let actionMessage = '';
+    var actionMessage = '';
     if (gameState.sessionState.hasConsensus) {
         actionMessage = '🆕 Starting new voting round...';
     } else if (gameState.sessionState.votesRevealed) {
@@ -276,10 +299,12 @@ function resetVotes() {
     console.log('🔄 Resetting votes with context:', {
         hasConsensus: gameState.sessionState.hasConsensus,
         votesRevealed: gameState.sessionState.votesRevealed,
-        votedCount: nonSpectators.filter(([_, player]) => player.hasVoted).length
+        votedCount: nonSpectators.filter(function(p) { return p[1].hasVoted; }).length
     });
     
-    gameState.socket.emit('resetVotes');
+    if (gameState.socket) {
+        gameState.socket.emit('resetVotes');
+    }
 }
 
 // UI Helper Functions
@@ -287,31 +312,31 @@ function showGameInterface(sessionData) {
     console.log('🎮 Showing game interface:', sessionData);
     
     // Hide join form
-    const joinForm = document.getElementById('joinInterface');
+    var joinForm = document.getElementById('joinInterface');
     if (joinForm) {
         joinForm.style.display = 'none';
     }
     
     // Show game interface
-    const gameInterface = document.getElementById('gameInterface');
+    var gameInterface = document.getElementById('gameInterface');
     if (gameInterface) {
         gameInterface.style.display = 'block';
     }
     
     // Update session info
-    const sessionInfo = document.getElementById('sessionInfo');
+    var sessionInfo = document.getElementById('sessionInfo');
     if (sessionInfo) {
-        sessionInfo.textContent = `Session: ${sessionData.sessionCode}`;
+        sessionInfo.textContent = 'Session: ' + sessionData.sessionCode;
     }
     
-    const shareLink = document.getElementById('shareLink');
+    var shareLink = document.getElementById('shareLink');
     if (shareLink) {
-        shareLink.textContent = sessionData.shareUrl || `${window.location.origin}?session=${sessionData.sessionCode}`;
+        shareLink.textContent = sessionData.shareUrl || (window.location.origin + '?session=' + sessionData.sessionCode);
     }
     
     // ENHANCEMENT 2: Show spectator controls if spectator
     if (sessionData.isSpectator) {
-        const spectatorControls = document.getElementById('spectatorControls');
+        var spectatorControls = document.getElementById('spectatorControls');
         if (spectatorControls) {
             spectatorControls.style.display = 'flex';
         }
@@ -332,16 +357,20 @@ function updateGameInterface() {
 
 // ENHANCEMENT 3: Enhanced Player Status Indicators
 function updatePlayerCards() {
-    const container = document.getElementById('playerCards');
+    var container = document.getElementById('playerCards');
     if (!container) return;
     
     container.innerHTML = '';
     
-    const players = gameState.sessionState.players;
-    const votesRevealed = gameState.sessionState.votesRevealed;
+    var players = gameState.sessionState.players;
+    var votesRevealed = gameState.sessionState.votesRevealed;
     
-    Object.entries(players).forEach(([name, player]) => {
-        const playerDiv = document.createElement('div');
+    // ES5 compatible object iteration
+    for (var name in players) {
+        if (!players.hasOwnProperty(name)) continue;
+        
+        var player = players[name];
+        var playerDiv = document.createElement('div');
         playerDiv.className = 'player-card';
         
         // ENHANCEMENT 3: Add visual state indicators
@@ -353,11 +382,11 @@ function updatePlayerCards() {
             }
         }
         
-        const nameDiv = document.createElement('div');
-        nameDiv.className = `player-name${player.isSpectator ? ' spectator' : ''}`;
-        nameDiv.textContent = `${name}${player.isSpectator ? ' (Spectator)' : ''}`;
+        var nameDiv = document.createElement('div');
+        nameDiv.className = 'player-name' + (player.isSpectator ? ' spectator' : '');
+        nameDiv.textContent = name + (player.isSpectator ? ' (Spectator)' : '');
         
-        const cardDiv = document.createElement('div');
+        var cardDiv = document.createElement('div');
         cardDiv.className = 'vote-card';
         
         // ENHANCEMENT 3: Enhanced visual feedback for different states
@@ -376,7 +405,7 @@ function updatePlayerCards() {
         }
         
         // Add status indicator below card
-        const statusDiv = document.createElement('small');
+        var statusDiv = document.createElement('small');
         if (player.isSpectator) {
             statusDiv.textContent = 'Observing';
             statusDiv.style.color = '#6c757d';
@@ -392,17 +421,18 @@ function updatePlayerCards() {
         playerDiv.appendChild(cardDiv);
         playerDiv.appendChild(statusDiv);
         container.appendChild(playerDiv);
-    });
+    }
 }
 
 // ENHANCEMENT 1: Enhanced voting cards with re-voting support
 function updateVotingCards() {
-    const cards = document.querySelectorAll('.fibonacci-card');
+    var cards = document.querySelectorAll('.fibonacci-card');
     
-    const canVote = !gameState.isSpectator && !gameState.sessionState.hasConsensus;
-    const isReVotingScenario = gameState.sessionState.votesRevealed && !gameState.sessionState.hasConsensus;
+    var canVote = !gameState.isSpectator && !gameState.sessionState.hasConsensus;
+    var isReVotingScenario = gameState.sessionState.votesRevealed && !gameState.sessionState.hasConsensus;
     
-    cards.forEach(card => {
+    for (var i = 0; i < cards.length; i++) {
+        var card = cards[i];
         // Remove all state classes
         card.classList.remove('disabled', 're-vote-allowed');
         
@@ -414,23 +444,42 @@ function updateVotingCards() {
         } else {
             card.classList.add('disabled');
         }
-    });
+    }
 }
 
 // ENHANCEMENT 2: Context-aware spectator controls
 function updateSpectatorControls() {
-    const resetButton = document.getElementById('resetButton');
-    const resetButtonSpectator = document.getElementById('resetButtonSpectator');
+    var resetButton = document.getElementById('resetButton');
+    var resetButtonSpectator = document.getElementById('resetButtonSpectator');
     
     if (!gameState.isSpectator) return;
     
-    const players = gameState.sessionState.players;
-    const nonSpectators = Object.entries(players).filter(([_, player]) => !player.isSpectator);
-    const hasVotes = nonSpectators.some(([_, player]) => player.hasVoted);
+    var players = gameState.sessionState.players;
+    var nonSpectators = [];
+    
+    // ES5 compatible object iteration
+    for (var playerName in players) {
+        if (players.hasOwnProperty(playerName)) {
+            var player = players[playerName];
+            if (!player.isSpectator) {
+                nonSpectators.push([playerName, player]);
+            }
+        }
+    }
+    
+    var hasVotes = false;
+    for (var i = 0; i < nonSpectators.length; i++) {
+        if (nonSpectators[i][1].hasVoted) {
+            hasVotes = true;
+            break;
+        }
+    }
     
     // Show/hide reset buttons based on votes
-    [resetButton, resetButtonSpectator].forEach(button => {
-        if (!button) return;
+    var buttons = [resetButton, resetButtonSpectator];
+    for (var i = 0; i < buttons.length; i++) {
+        var button = buttons[i];
+        if (!button) continue;
         
         if (hasVotes) {
             button.style.display = 'block';
@@ -449,18 +498,19 @@ function updateSpectatorControls() {
         } else {
             button.style.display = 'none';
         }
-    });
+    }
 }
 
 function updateSelectedVote(value) {
     // Clear previous selection
-    document.querySelectorAll('.fibonacci-card').forEach(card => {
-        card.classList.remove('selected');
-    });
+    var cards = document.querySelectorAll('.fibonacci-card');
+    for (var i = 0; i < cards.length; i++) {
+        cards[i].classList.remove('selected');
+    }
     
     // Select new vote
     if (value) {
-        const selectedCard = document.querySelector(`[data-value="${value}"]`);
+        var selectedCard = document.querySelector('[data-value="' + value + '"]');
         if (selectedCard) {
             selectedCard.classList.add('selected');
         }
@@ -473,7 +523,7 @@ function clearSelectedVote() {
 
 // ENHANCEMENT 1: Enhanced status messages with re-voting context
 function updateStatus(message) {
-    const statusEl = document.getElementById('gameStatus');
+    var statusEl = document.getElementById('gameStatus');
     if (!statusEl) return;
     
     if (message) {
@@ -483,62 +533,80 @@ function updateStatus(message) {
     }
     
     // Auto-generate status based on game state
-    const players = gameState.sessionState.players;
-    const nonSpectators = Object.entries(players).filter(([_, player]) => !player.isSpectator);
-    const totalVoters = nonSpectators.length;
-    const votedCount = nonSpectators.filter(([_, player]) => player.hasVoted).length;
+    var players = gameState.sessionState.players;
+    var nonSpectators = [];
+    var totalVoters = 0;
+    var votedCount = 0;
+    
+    // ES5 compatible object iteration
+    for (var playerName in players) {
+        if (players.hasOwnProperty(playerName)) {
+            var player = players[playerName];
+            if (!player.isSpectator) {
+                nonSpectators.push([playerName, player]);
+                totalVoters++;
+                if (player.hasVoted) {
+                    votedCount++;
+                }
+            }
+        }
+    }
     
     if (totalVoters === 0) {
         statusEl.innerHTML = '⏳ Waiting for voters to join...';
         statusEl.className = 'status';
     } else if (gameState.sessionState.votesRevealed) {
         if (gameState.sessionState.hasConsensus) {
-            const consensusVote = nonSpectators.find(([_, player]) => player.hasVoted)?.[1]?.vote;
-            statusEl.innerHTML = `
-                <div class="consensus">
-                    🎉 Consensus Reached! Story Points: ${consensusVote} 🎉
-                </div>
-            `;
+            var consensusVote = null;
+            for (var i = 0; i < nonSpectators.length; i++) {
+                if (nonSpectators[i][1].hasVoted) {
+                    consensusVote = nonSpectators[i][1].vote;
+                    break;
+                }
+            }
+            statusEl.innerHTML = '<div class="consensus">🎉 Consensus Reached! Story Points: ' + consensusVote + ' 🎉</div>';
         } else {
             // ENHANCEMENT 1: Enhanced messaging for re-voting
-            statusEl.innerHTML = `
-                <div class="no-consensus">
-                    ⚠️ No consensus reached.<br>
-                    <strong>You can change your vote or wait for spectator to reset.</strong>
-                </div>
-            `;
+            statusEl.innerHTML = '<div class="no-consensus">⚠️ No consensus reached.<br><strong>You can change your vote or wait for spectator to reset.</strong></div>';
             statusEl.className = 'status no-consensus';
         }
     } else {
-        statusEl.innerHTML = `📊 Voting: ${votedCount}/${totalVoters} players voted`;
+        statusEl.innerHTML = '📊 Voting: ' + votedCount + '/' + totalVoters + ' players voted';
         statusEl.className = 'status';
     }
 }
 
 // ENHANCEMENT 1: Visual feedback for re-voting
 function addReVotingVisualFeedback() {
-    const cards = document.querySelectorAll('.fibonacci-card');
-    cards.forEach(card => {
+    var cards = document.querySelectorAll('.fibonacci-card');
+    for (var i = 0; i < cards.length; i++) {
+        var card = cards[i];
         card.style.animation = 'gentle-pulse 1s ease-in-out';
-        setTimeout(() => {
-            card.style.animation = '';
-        }, 1000);
-    });
+        setTimeout(function(cardElement) {
+            return function() {
+                cardElement.style.animation = '';
+            };
+        }(card), 1000);
+    }
 }
 
 // Enhanced temporary message system
-function showTemporaryMessage(message, duration = 3000) {
-    // Remove any existing messages
-    const existingMessages = document.querySelectorAll('.temporary-message');
-    existingMessages.forEach(msg => msg.remove());
+function showTemporaryMessage(message, duration) {
+    duration = duration || 3000;
     
-    const messageDiv = document.createElement('div');
+    // Remove any existing messages
+    var existingMessages = document.querySelectorAll('.temporary-message');
+    for (var i = 0; i < existingMessages.length; i++) {
+        existingMessages[i].remove();
+    }
+    
+    var messageDiv = document.createElement('div');
     messageDiv.className = 'temporary-message';
     messageDiv.textContent = message;
     
     document.body.appendChild(messageDiv);
     
-    setTimeout(() => {
+    setTimeout(function() {
         if (messageDiv.parentNode) {
             messageDiv.parentNode.removeChild(messageDiv);
         }
@@ -551,15 +619,15 @@ function generateSessionCode() {
 }
 
 function copyShareLink() {
-    const shareLink = document.getElementById('shareLink');
+    var shareLink = document.getElementById('shareLink');
     if (!shareLink) return;
     
-    const shareLinkText = shareLink.textContent;
+    var shareLinkText = shareLink.textContent;
     
     if (navigator.clipboard) {
-        navigator.clipboard.writeText(shareLinkText).then(() => {
+        navigator.clipboard.writeText(shareLinkText).then(function() {
             showTemporaryMessage('✅ Link copied to clipboard!');
-        }).catch(() => {
+        }).catch(function() {
             showTemporaryMessage('❌ Unable to copy - please copy manually');
         });
     } else {
@@ -571,7 +639,7 @@ function copyShareLink() {
 // Error and Loading States
 function showError(message) {
     console.error('❌ Error:', message);
-    const errorEl = document.getElementById('errorMessage');
+    var errorEl = document.getElementById('errorMessage');
     if (errorEl) {
         errorEl.textContent = message;
         errorEl.style.display = 'block';
@@ -582,21 +650,21 @@ function showError(message) {
 }
 
 function hideError() {
-    const errorEl = document.getElementById('errorMessage');
+    var errorEl = document.getElementById('errorMessage');
     if (errorEl) {
         errorEl.style.display = 'none';
     }
 }
 
 function showLoading() {
-    const loadingEl = document.getElementById('loadingState');
+    var loadingEl = document.getElementById('loadingState');
     if (loadingEl) {
         loadingEl.style.display = 'block';
     }
 }
 
 function hideLoading() {
-    const loadingEl = document.getElementById('loadingState');
+    var loadingEl = document.getElementById('loadingState');
     if (loadingEl) {
         loadingEl.style.display = 'none';
     }
@@ -605,18 +673,18 @@ function hideLoading() {
 // Enhanced keyboard shortcuts
 document.addEventListener('keydown', function(event) {
     // Only handle shortcuts when in game interface
-    const gameInterface = document.getElementById('gameInterface');
+    var gameInterface = document.getElementById('gameInterface');
     if (!gameInterface || gameInterface.style.display === 'none') {
         return;
     }
     
     // Number keys 1-6 for Fibonacci votes
-    const fibValues = [1, 2, 3, 5, 8, 13];
-    const keyNum = event.key ? parseInt(event.key) : null;
+    var fibValues = [1, 2, 3, 5, 8, 13];
+    var keyNum = event.key ? parseInt(event.key) : null;
     
     if (keyNum >= 1 && keyNum <= 6) {
         event.preventDefault();
-        const voteValue = fibValues[keyNum - 1];
+        var voteValue = fibValues[keyNum - 1];
         castVote(voteValue);
     }
     
@@ -630,7 +698,7 @@ document.addEventListener('keydown', function(event) {
 // Authentication Functions
 function checkAuthentication() {
     // Check if user is already authenticated (stored in localStorage)
-    const isAuthenticated = localStorage.getItem('planningPoker_authenticated') === 'true';
+    var isAuthenticated = localStorage.getItem('planningPoker_authenticated') === 'true';
     
     if (isAuthenticated) {
         hidePasswordField();
@@ -641,34 +709,42 @@ function checkAuthentication() {
 }
 
 function handlePasswordAuth() {
-    const passwordField = document.getElementById('teamPassword');
-    const correctPassword = '••••••••••'; // This is the masked display
+    var isAuthenticated = localStorage.getItem('planningPoker_authenticated') === 'true';
     
-    // Create password input modal
+    if (isAuthenticated) {
+        showTemporaryMessage('ℹ️ Already authenticated.');
+        return;
+    }
+    
     showPasswordModal();
 }
 
 function showPasswordModal() {
+    // Remove any existing modal
+    var existingModal = document.querySelector('.password-modal-overlay');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
     // Create modal overlay
-    const modalOverlay = document.createElement('div');
+    var modalOverlay = document.createElement('div');
     modalOverlay.className = 'password-modal-overlay';
-    modalOverlay.innerHTML = `
-        <div class="password-modal">
-            <h3>🔐 Enter Team Password</h3>
-            <p>Please enter the team password to access Planning Poker:</p>
-            <input type="password" id="passwordInput" placeholder="Enter password" maxlength="50">
-            <div class="modal-buttons">
-                <button id="submitPassword" class="btn-primary">Submit</button>
-                <button id="cancelPassword" class="btn-secondary">Cancel</button>
-            </div>
-            <div id="passwordError" class="password-error" style="display: none;"></div>
-        </div>
-    `;
+    modalOverlay.innerHTML = 
+        '<div class="password-modal">' +
+            '<h3>🔐 Enter Team Password</h3>' +
+            '<p>Please enter the team password to access Planning Poker:</p>' +
+            '<input type="password" id="passwordInput" placeholder="Enter password" maxlength="50">' +
+            '<div class="modal-buttons">' +
+                '<button id="submitPassword" class="btn-primary">Submit</button>' +
+                '<button id="cancelPassword" class="btn-secondary">Cancel</button>' +
+            '</div>' +
+            '<div id="passwordError" class="password-error" style="display: none;"></div>' +
+        '</div>';
     
     document.body.appendChild(modalOverlay);
     
     // Focus on password input
-    const passwordInput = document.getElementById('passwordInput');
+    var passwordInput = document.getElementById('passwordInput');
     passwordInput.focus();
     
     // Event listeners
@@ -683,20 +759,22 @@ function showPasswordModal() {
     });
     
     // Escape key to close
-    document.addEventListener('keydown', function(e) {
+    var escapeHandler = function(e) {
         if (e.key === 'Escape') {
             closePasswordModal();
+            document.removeEventListener('keydown', escapeHandler);
         }
-    });
+    };
+    document.addEventListener('keydown', escapeHandler);
 }
 
 function validatePassword() {
-    const passwordInput = document.getElementById('passwordInput');
-    const enteredPassword = passwordInput.value.trim();
-    const passwordError = document.getElementById('passwordError');
+    var passwordInput = document.getElementById('passwordInput');
+    var enteredPassword = passwordInput.value.trim();
+    var passwordError = document.getElementById('passwordError');
     
     // You can customize this password or make it configurable
-    const correctPassword = 'team2024'; // Change this to your desired password
+    var correctPassword = 'team2024'; // Change this to your desired password
     
     if (enteredPassword === correctPassword) {
         // Password correct
@@ -713,30 +791,30 @@ function validatePassword() {
         passwordInput.focus();
         
         // Shake animation for the modal
-        const modal = document.querySelector('.password-modal');
-        modal.style.animation = 'shake 0.5s ease-in-out';
-        setTimeout(() => {
+        var modal = document.querySelector('.password-modal');
+        modal.style.animation = 'slideIn 0.5s ease-in-out';
+        setTimeout(function() {
             modal.style.animation = '';
         }, 500);
     }
 }
 
 function closePasswordModal() {
-    const modal = document.querySelector('.password-modal-overlay');
+    var modal = document.querySelector('.password-modal-overlay');
     if (modal) {
         modal.remove();
     }
 }
 
 function hidePasswordField() {
-    const passwordGroup = document.getElementById('passwordGroup');
+    var passwordGroup = document.getElementById('passwordGroup');
     if (passwordGroup) {
         passwordGroup.style.display = 'none';
     }
 }
 
 function showPasswordField() {
-    const passwordGroup = document.getElementById('passwordGroup');
+    var passwordGroup = document.getElementById('passwordGroup');
     if (passwordGroup) {
         passwordGroup.style.display = 'block';
     }
@@ -744,8 +822,8 @@ function showPasswordField() {
 
 function focusOnPlayerName() {
     // Focus on player name field after authentication
-    setTimeout(() => {
-        const playerNameField = document.getElementById('playerName');
+    setTimeout(function() {
+        var playerNameField = document.getElementById('playerName');
         if (playerNameField) {
             playerNameField.focus();
         }
