@@ -610,7 +610,7 @@ function hideLoading() {
     }
 }
 
-// Enhanced keyboard shortcuts
+/* Enhanced keyboard shortcuts
 document.addEventListener('keydown', function(event) {
     // Only handle shortcuts when in game interface
     var gameInterface = document.getElementById('gameInterface');
@@ -629,12 +629,13 @@ document.addEventListener('keydown', function(event) {
     }
     
     // 'R' key for reset (Spectator only)
-    if (event.key.toLowerCase() === 'r' && gameState.isSpectator) {
-        event.preventDefault();
-        resetVotes();
-    }
+    //if (event.key.toLowerCase() === 'r' && gameState.isSpectator) {
+    //    event.preventDefault();
+    //    resetVotes();
+    //}
+    
 });
-
+*/
 // Authentication Functions
 function checkAuthentication() {
     var isAuthenticated = localStorage.getItem('planningPoker_authenticated') === 'true';
