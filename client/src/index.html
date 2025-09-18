@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Planning Poker - Team Access Required</title>
     <style>
-        /* Modern CSS with beautiful card design */
+        /* Modern CSS with beautiful card design + Enhanced Re-voting Features */
         * {
             margin: 0;
             padding: 0;
@@ -149,7 +149,7 @@
             background: #dee2e6;
         }
 
-        /* Player Cards */
+        /* Enhanced Player Cards with Voting State Indicators */
         .players-section {
             margin-bottom: 30px;
         }
@@ -160,24 +160,44 @@
         }
 
         #playerCards {
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
             gap: 15px;
         }
 
         .player-card {
-            background: white;
-            border: 2px solid #e1e5e9;
-            border-radius: 10px;
+            background: #f8f9fa;
+            border-radius: 15px;
             padding: 15px;
             text-align: center;
-            min-width: 120px;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .player-card.has-voted {
+            border-color: #28a745;
+            background: linear-gradient(135deg, #f8fff9 0%, #f1f8ff 100%);
+        }
+
+        .player-card.needs-vote {
+            border-color: #ffc107;
+            background: linear-gradient(135deg, #fffdf5 0%, #fff8e1 100%);
+            animation: gentle-glow 2s infinite;
+        }
+
+        @keyframes gentle-glow {
+            0%, 100% { 
+                box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+            }
+            50% { 
+                box-shadow: 0 4px 16px rgba(255, 193, 7, 0.4);
+            }
         }
 
         .player-name {
             font-weight: 600;
-            margin-bottom: 8px;
-            color: #333;
+            margin-bottom: 10px;
+            color: #555;
         }
 
         .player-name.spectator {
@@ -185,35 +205,44 @@
             font-style: italic;
         }
 
+        /* Enhanced Vote Cards within Player Cards */
         .vote-card {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
+            width: 50px;
+            height: 70px;
+            background: white;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto;
+            font-size: 1.2rem;
             font-weight: bold;
-            font-size: 16px;
+            margin: 0 auto;
+        }
+
+        .vote-card.revealed {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+            font-size: 1.4rem;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .vote-card.hidden {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border-color: #28a745;
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
         }
 
         .vote-card.no-vote {
             background: #f8f9fa;
-            border: 2px solid #dee2e6;
             color: #6c757d;
+            border: 2px dashed #dee2e6;
         }
 
-        .vote-card.voted {
-            background: #28a745;
-            color: white;
-        }
-
-        .vote-card.revealed {
-            background: #007bff;
-            color: white;
-        }
-
-        /* Voting Cards */
+        /* Enhanced Voting Cards for Re-voting Scenarios */
         .voting-section {
             margin-bottom: 30px;
         }
@@ -248,7 +277,7 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
 
-        .fibonacci-card:hover {
+        .fibonacci-card:hover:not(.disabled) {
             transform: translateY(-5px);
             box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
             background: #f8f9ff;
@@ -258,29 +287,33 @@
             background: #667eea;
             color: white;
             transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.5);
         }
 
         .fibonacci-card.disabled {
-            opacity: 0.5;
+            opacity: 0.4;
             cursor: not-allowed;
             pointer-events: none;
+            filter: grayscale(0.5);
         }
-        .status.no-consensus {
-    background: linear-gradient(135deg, #ff9a56 0%, #ff6b35 100%);
-    color: white;
-    padding: 15px;
-    border-radius: 10px;
-    text-align: center;
-    font-weight: 500;
-    box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
-    margin: 20px 0;
-}
 
-.no-consensus strong {
-    font-weight: 700;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
-}
-        /* Status and Controls */
+        /* Add pulse animation for re-voting allowed state */
+        .fibonacci-card.re-vote-allowed {
+            animation: gentle-pulse 2s infinite;
+        }
+
+        @keyframes gentle-pulse {
+            0%, 100% { 
+                border-color: #667eea;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            }
+            50% { 
+                border-color: #28a745;
+                box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+            }
+        }
+
+        /* Enhanced Status Section */
         .status-section {
             text-align: center;
             margin-bottom: 20px;
@@ -293,58 +326,192 @@
             margin-bottom: 15px;
         }
 
-        .consensus {
-            background: linear-gradient(135deg, #28a745, #20c997);
+        /* Enhanced Status Messages */
+        .status {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: 500;
+            margin: 20px 0;
+            border: 2px solid #dee2e6;
+        }
+
+        .status.no-consensus {
+            background: linear-gradient(135deg, #ff9a56 0%, #ff6b35 100%);
             color: white;
             padding: 15px;
             border-radius: 10px;
-            font-size: 20px;
-            font-weight: bold;
+            text-align: center;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+            margin: 20px 0;
         }
 
-        #resetButton {
-            background: #dc3545;
+        .no-consensus strong {
+            font-weight: 700;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+
+        /* Enhanced Consensus Display */
+        .consensus {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 700;
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.3);
+            margin: 20px 0;
+            animation: celebration 0.5s ease-out;
+        }
+
+        @keyframes celebration {
+            0% { 
+                transform: scale(0.8);
+                opacity: 0;
+            }
+            50% { 
+                transform: scale(1.05);
+            }
+            100% { 
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Enhanced Spectator Controls */
+        .spectator-controls {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            margin-top: 25px;
+            padding: 20px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 15px;
+            border: 2px solid #dee2e6;
+        }
+
+        .spectator-controls button {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
             color: white;
             border: none;
             padding: 12px 24px;
             border-radius: 8px;
             font-size: 16px;
+            font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+            min-width: 160px;
+        }
+
+        .spectator-controls button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(220, 53, 69, 0.4);
+            background: linear-gradient(135deg, #c82333 0%, #a71e2a 100%);
+        }
+
+        .spectator-controls button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+        }
+
+        #resetButton {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+            min-width: 160px;
         }
 
         #resetButton:hover {
-            background: #c82333;
             transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(220, 53, 69, 0.4);
+            background: linear-gradient(135deg, #c82333 0%, #a71e2a 100%);
         }
 
-        /* Error and Loading States */
+        /* Temporary Message Styling */
+        .temporary-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-weight: 600;
+            box-shadow: 0 6px 20px rgba(23, 162, 184, 0.4);
+            z-index: 1000;
+            animation: slide-in 0.3s ease-out, slide-out 0.3s ease-in 2.7s forwards;
+        }
+
+        @keyframes slide-in {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slide-out {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        /* Error Message Improvements */
         #errorMessage {
-            background: #f8d7da;
-            color: #721c24;
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
             padding: 15px;
-            border-radius: 8px;
+            border-radius: 10px;
             margin-bottom: 20px;
-            border: 1px solid #f5c6cb;
+            text-align: center;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+            animation: shake 0.5s ease-in-out;
             display: none;
         }
 
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        /* Loading State Improvements */
         #loadingState {
             text-align: center;
-            padding: 20px;
-            color: #6c757d;
+            padding: 30px;
+            color: #667eea;
             display: none;
         }
 
         .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(102, 126, 234, 0.2);
+            border-top: 4px solid #667eea;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-right: 10px;
+            margin: 0 auto 15px;
+            display: inline-block;
         }
 
         @keyframes spin {
@@ -366,7 +533,28 @@
             padding: 20px;
         }
 
-        /* Responsive Design */
+        /* Accessibility improvements */
+        .fibonacci-card:focus,
+        .spectator-controls button:focus,
+        #resetButton:focus {
+            outline: 3px solid #667eea;
+            outline-offset: 2px;
+        }
+
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            .fibonacci-card {
+                border-width: 4px;
+            }
+            
+            .consensus,
+            .no-consensus,
+            .temporary-message {
+                border: 3px solid currentColor;
+            }
+        }
+
+        /* Mobile Responsiveness Enhancements */
         @media (max-width: 768px) {
             .container {
                 margin: 10px;
@@ -386,17 +574,34 @@
             }
 
             .fibonacci-cards {
+                grid-template-columns: repeat(3, 1fr);
                 gap: 10px;
             }
 
             .fibonacci-card {
-                width: 60px;
-                height: 90px;
-                font-size: 18px;
+                width: 70px;
+                height: 100px;
+                font-size: 20px;
             }
 
             #playerCards {
-                justify-content: center;
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+                gap: 10px;
+            }
+
+            .temporary-message {
+                top: 10px;
+                right: 10px;
+                left: 10px;
+                padding: 12px 20px;
+                font-size: 14px;
+            }
+
+            .spectator-controls button,
+            #resetButton {
+                min-width: 140px;
+                padding: 10px 20px;
+                font-size: 14px;
             }
         }
     </style>
@@ -466,19 +671,26 @@
                 <div class="voting-section">
                     <h3>Cast Your Vote</h3>
                     <div class="fibonacci-cards">
-                        <div class="fibonacci-card" data-value="1">1</div>
-                        <div class="fibonacci-card" data-value="2">2</div>
-                        <div class="fibonacci-card" data-value="3">3</div>
-                        <div class="fibonacci-card" data-value="5">5</div>
-                        <div class="fibonacci-card" data-value="8">8</div>
-                        <div class="fibonacci-card" data-value="13">13</div>
+                        <div class="fibonacci-card" data-value="1" tabindex="0">1</div>
+                        <div class="fibonacci-card" data-value="2" tabindex="0">2</div>
+                        <div class="fibonacci-card" data-value="3" tabindex="0">3</div>
+                        <div class="fibonacci-card" data-value="5" tabindex="0">5</div>
+                        <div class="fibonacci-card" data-value="8" tabindex="0">8</div>
+                        <div class="fibonacci-card" data-value="13" tabindex="0">13</div>
                     </div>
                 </div>
                 
                 <!-- Status Section -->
                 <div class="status-section">
                     <div id="gameStatus">Waiting for players...</div>
-                    <button id="resetButton" style="display: none;">Reset Votes</button>
+                    <button id="resetButton" style="display: none;" tabindex="0">Reset Votes</button>
+                </div>
+
+                <!-- Spectator Controls (will be shown via JavaScript for spectators) -->
+                <div id="spectatorControls" class="spectator-controls">
+                    <button class="btn btn-secondary" id="resetButtonSpectator" tabindex="0">
+                        🔄 Reset Votes
+                    </button>
                 </div>
             </div>
         </div>
