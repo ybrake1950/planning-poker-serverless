@@ -1,7 +1,6 @@
-// Enhanced Planning Poker Frontend - app.js (ES5 Compatible)
-// Directory: Execute from client/src/ folder
-// Fixed: Removed const declarations that cause parsing errors
-// Compatible with older JavaScript engines and strict mode
+// Enhanced Planning Poker Frontend - app.js
+// Directory: client/src/app.js
+// Complete working version with backend connection
 
 // Global game state
 var gameState = {
@@ -84,202 +83,54 @@ function setupEventListeners() {
     });
 }
 
-// Test Mode for when backend is not available
-function enableTestMode() {
-    console.log('🧪 Enabling test mode - mock backend functionality');
-    gameState.isConnected = true;
-    
-    // Hide loading and show success
-    setTimeout(function() {
-        hideLoading();
-        showTemporaryMessage('🧪 Test mode enabled - All UI features active!');
-    }, 1000);
-    
-    // Create mock socket object
-    gameState.socket = {
-        emit: function(event, data) {
-            console.log('🧪 Mock socket emit:', event, data);
-            
-            // Handle joinSession
-            if (event === 'joinSession') {
-                setTimeout(function() {
-                    var mockSessionData = {
-                        sessionCode: data.sessionCode || generateSessionCode(),
-                        playerName: data.playerName,
-                        isSpectator: data.isSpectator || false,
-                        shareUrl: window.location.origin + '?session=' + (data.sessionCode || 'MOCK123')
-                    };
-                    
-                    // Set game state
-                    gameState.isSpectator = mockSessionData.isSpectator;
-                    gameState.playerName = mockSessionData.playerName;
-                    
-                    // Show game interface
-                    showGameInterface(mockSessionData);
-                    
-                    // Create mock players for realistic testing
-                    var mockPlayers = {};
-                    mockPlayers[data.playerName] = { 
-                        hasVoted: false, 
-                        vote: null, 
-                        isSpectator: data.isSpectator || false
-                    };
-                    
-                    // Add some other mock players based on role
-                    if (data.isSpectator) {
-                        mockPlayers['Alice'] = { hasVoted: true, vote: 5, isSpectator: false };
-                        mockPlayers['Bob'] = { hasVoted: true, vote: 8, isSpectator: false };
-                        mockPlayers['Charlie'] = { hasVoted: false, vote: null, isSpectator: false };
-                    } else {
-                        mockPlayers['Spectator'] = { hasVoted: false, vote: null, isSpectator: true };
-                        mockPlayers['Alice'] = { hasVoted: true, vote: 5, isSpectator: false };
-                    }
-                    
-                    // Set session state
-                    gameState.sessionState = {
-                        players: mockPlayers,
-                        votesRevealed: false,
-                        hasConsensus: false
-                    };
-                    
-                    updateGameInterface();
-                    showTemporaryMessage('✅ Mock session created successfully!');
-                }, 800);
-            }
-            
-            // Handle castVote
-            if (event === 'castVote') {
-                setTimeout(function() {
-                    gameState.currentVote = data.vote;
-                    
-                    // Update player's vote in mock state
-                    if (gameState.sessionState.players[gameState.playerName]) {
-                        gameState.sessionState.players[gameState.playerName].hasVoted = true;
-                        gameState.sessionState.players[gameState.playerName].vote = data.vote;
-                    }
-                    
-                    // Check if all non-spectators have voted
-                    var nonSpectators = [];
-                    for (var playerName in gameState.sessionState.players) {
-                        if (gameState.sessionState.players.hasOwnProperty(playerName)) {
-                            var player = gameState.sessionState.players[playerName];
-                            if (!player.isSpectator) {
-                                nonSpectators.push(player);
-                            }
-                        }
-                    }
-                    
-                    var allVoted = nonSpectators.length > 0 && nonSpectators.every(function(p) { return p.hasVoted; });
-                    
-                    if (allVoted) {
-                        gameState.sessionState.votesRevealed = true;
-                        
-                        // Check for consensus
-                        var votes = nonSpectators.map(function(p) { return p.vote; });
-                        var firstVote = votes[0];
-                        gameState.sessionState.hasConsensus = votes.every(function(v) { return v === firstVote; });
-                        
-                        if (gameState.sessionState.hasConsensus) {
-                            showTemporaryMessage('🎉 Consensus reached! Story points: ' + firstVote);
-                        } else {
-                            showTemporaryMessage('⚠️ No consensus - you can change your vote!');
-                        }
-                    } else {
-                        showTemporaryMessage('✅ Vote recorded: ' + data.vote);
-                    }
-                    
-                    updateGameInterface();
-                }, 400);
-            }
-            
-            // Handle resetVotes
-            if (event === 'resetVotes') {
-                setTimeout(function() {
-                    // Reset all player votes
-                    for (var playerName in gameState.sessionState.players) {
-                        if (gameState.sessionState.players.hasOwnProperty(playerName)) {
-                            gameState.sessionState.players[playerName].hasVoted = false;
-                            gameState.sessionState.players[playerName].vote = null;
-                        }
-                    }
-                    
-                    gameState.sessionState.votesRevealed = false;
-                    gameState.sessionState.hasConsensus = false;
-                    gameState.currentVote = null;
-                    
-                    clearSelectedVote();
-                    updateGameInterface();
-                    showTemporaryMessage('🔄 Votes reset - new round started!');
-                }, 300);
-            }
-        }
-    };
-}
-
-// Modified connectToServer function with test mode fallback
-// REPLACE your existing connectToServer function with this enhanced version:
-
+// Connect to server
 function connectToServer() {
     console.log('🔌 Connecting to server...');
     
-    var serverUrl = window.location.hostname === 'localhost' 
-        ? 'http://localhost:3001' 
-        : window.location.origin;
+    var serverUrl = 'http://localhost:3001';
     
     // Check if Socket.IO is available
     if (typeof io === 'undefined') {
-        console.log('⚠️ Socket.IO not available - enabling test mode');
-        enableTestMode();
+        console.log('⚠️ Socket.IO not available');
+        showError('Socket.IO library not loaded');
         return;
     }
-    
-    // Set up connection timeout for test mode fallback
-    var connectionTimeout = setTimeout(function() {
-        console.log('⚠️ Backend connection timeout - falling back to test mode');
-        enableTestMode();
-    }, 3000); // 3 second timeout
     
     try {
         gameState.socket = io(serverUrl, {
             transports: ['websocket', 'polling'],
             upgrade: true,
-            rememberUpgrade: true,
-            timeout: 3000
+            rememberUpgrade: true
         });
         
         // Connection established
         gameState.socket.on('connect', function() {
-            clearTimeout(connectionTimeout);
-            console.log('✅ Connected to real backend server');
+            console.log('✅ Connected to backend server');
             gameState.isConnected = true;
             hideError();
             hideLoading();
-            showTemporaryMessage('✅ Connected to backend server!');
+            showTemporaryMessage('✅ Connected to server!');
         });
         
         // Connection failed
         gameState.socket.on('connect_error', function(error) {
-            clearTimeout(connectionTimeout);
-            console.log('❌ Backend connection failed:', error);
-            console.log('🧪 Switching to test mode...');
-            enableTestMode();
+            console.log('❌ Connection failed:', error);
+            showError('Failed to connect to server. Please check if the server is running.');
         });
         
-        // Connection failed
+        // Disconnect handling
         gameState.socket.on('disconnect', function() {
             console.log('❌ Disconnected from server');
             gameState.isConnected = false;
-            showError('Connection lost. Trying to reconnect...');
+            showError('Disconnected from server');
         });
         
         // Session joined successfully
         gameState.socket.on('sessionJoined', function(data) {
-            clearTimeout(connectionTimeout);
             console.log('🎮 Session joined:', data);
             gameState.isSpectator = data.isSpectator;
             gameState.playerName = data.playerName;
             showGameInterface(data);
-            updateGameInterface();
         });
         
         // Session state update
@@ -304,14 +155,11 @@ function connectToServer() {
         gameState.socket.on('error', function(data) {
             console.error('❌ Server error:', data);
             showError(data.message || 'Server error occurred');
-            hideLoading();
         });
         
     } catch (error) {
-        clearTimeout(connectionTimeout);
-        console.log('❌ Socket.IO connection error:', error);
-        console.log('🧪 Enabling test mode due to connection error');
-        enableTestMode();
+        console.log('❌ Socket connection error:', error);
+        showError('Failed to connect to server');
     }
 }
 
@@ -342,7 +190,7 @@ function joinSession() {
     // Determine if creating new session or joining existing
     var finalSessionCode = sessionCode || generateSessionCode();
     
-    console.log('🎯 ' + (sessionCode ? 'Joining' : 'Creating') + ' session: ' + finalSessionCode + ' as ' + (isSpectator ? 'Spectator' : 'Player'));
+    console.log('🎯 Joining session: ' + finalSessionCode + ' as ' + (isSpectator ? 'Spectator' : 'Player'));
     
     // Send join request to server
     gameState.socket.emit('joinSession', {
@@ -352,7 +200,7 @@ function joinSession() {
     });
 }
 
-// ENHANCEMENT 1: Cast a vote with dynamic vote changing support
+// Cast a vote
 function castVote(value) {
     console.log('🗳️ Vote button clicked: ' + value);
     
@@ -366,7 +214,7 @@ function castVote(value) {
         return;
     }
     
-    // ENHANCEMENT 1: Allow re-voting when no consensus, even if votes are revealed
+    // Allow re-voting when no consensus, even if votes are revealed
     var canVote = !gameState.sessionState.hasConsensus;
     var isRevotingScenario = gameState.sessionState.votesRevealed && !gameState.sessionState.hasConsensus;
     
@@ -385,24 +233,17 @@ function castVote(value) {
         showTemporaryMessage('✅ Vote recorded: ' + value);
     }
     
-    console.log('🗳️ Casting vote: ' + value + (isRevotingScenario ? ' (re-voting)' : ''));
+    console.log('🗳️ Casting vote: ' + value);
     
     // Update local state and UI immediately for responsiveness
     gameState.currentVote = value;
     updateSelectedVote(value);
     
-    // Add visual feedback for re-voting scenario
-    if (isRevotingScenario) {
-        addReVotingVisualFeedback();
-    }
-    
     // Send vote to server
-    if (gameState.socket) {
-        gameState.socket.emit('castVote', { vote: value });
-    }
+    gameState.socket.emit('castVote', { vote: value });
 }
 
-// ENHANCEMENT 2: Smart spectator reset with context-aware behavior
+// Reset votes
 function resetVotes() {
     console.log('🔄 Reset votes button clicked');
     
@@ -416,53 +257,8 @@ function resetVotes() {
         return;
     }
     
-    // ENHANCEMENT 2: Provide contextual feedback based on current state
-    var players = gameState.sessionState.players;
-    var nonSpectators = [];
-    
-    // Convert object entries to array (ES5 compatible)
-    for (var playerName in players) {
-        if (players.hasOwnProperty(playerName)) {
-            var player = players[playerName];
-            if (!player.isSpectator) {
-                nonSpectators.push([playerName, player]);
-            }
-        }
-    }
-    
-    var hasVotes = false;
-    for (var i = 0; i < nonSpectators.length; i++) {
-        if (nonSpectators[i][1].hasVoted) {
-            hasVotes = true;
-            break;
-        }
-    }
-    
-    if (!hasVotes) {
-        showTemporaryMessage('ℹ️ No votes to reset');
-        return;
-    }
-    
-    var actionMessage = '';
-    if (gameState.sessionState.hasConsensus) {
-        actionMessage = '🆕 Starting new voting round...';
-    } else if (gameState.sessionState.votesRevealed) {
-        actionMessage = '🔄 Resetting for re-vote...';
-    } else {
-        actionMessage = '🔄 Resetting current votes...';
-    }
-    
-    showTemporaryMessage(actionMessage);
-    
-    console.log('🔄 Resetting votes with context:', {
-        hasConsensus: gameState.sessionState.hasConsensus,
-        votesRevealed: gameState.sessionState.votesRevealed,
-        votedCount: nonSpectators.filter(function(p) { return p[1].hasVoted; }).length
-    });
-    
-    if (gameState.socket) {
-        gameState.socket.emit('resetVotes');
-    }
+    console.log('🔄 Resetting votes');
+    gameState.socket.emit('resetVotes');
 }
 
 // UI Helper Functions
@@ -492,7 +288,7 @@ function showGameInterface(sessionData) {
         shareLink.textContent = sessionData.shareUrl || (window.location.origin + '?session=' + sessionData.sessionCode);
     }
     
-    // ENHANCEMENT 2: Show spectator controls if spectator
+    // Show spectator controls if spectator
     if (sessionData.isSpectator) {
         var spectatorControls = document.getElementById('spectatorControls');
         if (spectatorControls) {
@@ -507,13 +303,13 @@ function showGameInterface(sessionData) {
 }
 
 function updateGameInterface() {
-    updatePlayerCards(); // ENHANCEMENT 3
-    updateVotingCards(); // ENHANCEMENT 1
-    updateStatus();     
-    updateSpectatorControls(); // ENHANCEMENT 2
+    updatePlayerCards();
+    updateVotingCards();
+    updateStatus();
+    updateSpectatorControls();
 }
 
-// ENHANCEMENT 3: Enhanced Player Status Indicators
+// Enhanced Player Status Indicators
 function updatePlayerCards() {
     var container = document.getElementById('playerCards');
     if (!container) return;
@@ -531,7 +327,7 @@ function updatePlayerCards() {
         var playerDiv = document.createElement('div');
         playerDiv.className = 'player-card';
         
-        // ENHANCEMENT 3: Add visual state indicators
+        // Add visual state indicators
         if (!player.isSpectator) {
             if (player.hasVoted) {
                 playerDiv.classList.add('has-voted');
@@ -547,7 +343,7 @@ function updatePlayerCards() {
         var cardDiv = document.createElement('div');
         cardDiv.className = 'vote-card';
         
-        // ENHANCEMENT 3: Enhanced visual feedback for different states
+        // Enhanced visual feedback for different states
         if (player.isSpectator) {
             cardDiv.classList.add('no-vote');
             cardDiv.textContent = '👁️';
@@ -582,7 +378,7 @@ function updatePlayerCards() {
     }
 }
 
-// ENHANCEMENT 1: Enhanced voting cards with re-voting support
+// Enhanced voting cards with re-voting support
 function updateVotingCards() {
     var cards = document.querySelectorAll('.fibonacci-card');
     
@@ -596,7 +392,7 @@ function updateVotingCards() {
         
         if (canVote) {
             if (isReVotingScenario) {
-                // ENHANCEMENT 1: Add special styling for re-voting scenario
+                // Add special styling for re-voting scenario
                 card.classList.add('re-vote-allowed');
             }
         } else {
@@ -605,7 +401,7 @@ function updateVotingCards() {
     }
 }
 
-// ENHANCEMENT 2: Context-aware spectator controls
+// Context-aware spectator controls
 function updateSpectatorControls() {
     var resetButton = document.getElementById('resetButton');
     var resetButtonSpectator = document.getElementById('resetButtonSpectator');
@@ -642,7 +438,7 @@ function updateSpectatorControls() {
         if (hasVotes) {
             button.style.display = 'block';
             
-            // ENHANCEMENT 2: Context-aware button text
+            // Context-aware button text
             if (gameState.sessionState.hasConsensus) {
                 button.textContent = '🆕 Start New Round';
                 button.title = 'Start a new voting round';
@@ -679,7 +475,7 @@ function clearSelectedVote() {
     updateSelectedVote(null);
 }
 
-// ENHANCEMENT 1: Enhanced status messages with re-voting context
+// Enhanced status messages with re-voting context
 function updateStatus(message) {
     var statusEl = document.getElementById('gameStatus');
     if (!statusEl) return;
@@ -724,27 +520,13 @@ function updateStatus(message) {
             }
             statusEl.innerHTML = '<div class="consensus">🎉 Consensus Reached! Story Points: ' + consensusVote + ' 🎉</div>';
         } else {
-            // ENHANCEMENT 1: Enhanced messaging for re-voting
+            // Enhanced messaging for re-voting
             statusEl.innerHTML = '<div class="no-consensus">⚠️ No consensus reached.<br><strong>You can change your vote or wait for spectator to reset.</strong></div>';
             statusEl.className = 'status no-consensus';
         }
     } else {
         statusEl.innerHTML = '📊 Voting: ' + votedCount + '/' + totalVoters + ' players voted';
         statusEl.className = 'status';
-    }
-}
-
-// ENHANCEMENT 1: Visual feedback for re-voting
-function addReVotingVisualFeedback() {
-    var cards = document.querySelectorAll('.fibonacci-card');
-    for (var i = 0; i < cards.length; i++) {
-        var card = cards[i];
-        card.style.animation = 'gentle-pulse 1s ease-in-out';
-        setTimeout(function(cardElement) {
-            return function() {
-                cardElement.style.animation = '';
-            };
-        }(card), 1000);
     }
 }
 
@@ -847,15 +629,14 @@ document.addEventListener('keydown', function(event) {
     }
     
     // 'R' key for reset (Spectator only)
-    //if (event.key.toLowerCase() === 'r' && gameState.isSpectator) {
-    //    event.preventDefault();
-    //    resetVotes();
-    //}
+    if (event.key.toLowerCase() === 'r' && gameState.isSpectator) {
+        event.preventDefault();
+        resetVotes();
+    }
 });
 
 // Authentication Functions
 function checkAuthentication() {
-    // Check if user is already authenticated (stored in localStorage)
     var isAuthenticated = localStorage.getItem('planningPoker_authenticated') === 'true';
     
     if (isAuthenticated) {
@@ -878,13 +659,11 @@ function handlePasswordAuth() {
 }
 
 function showPasswordModal() {
-    // Remove any existing modal
     var existingModal = document.querySelector('.password-modal-overlay');
     if (existingModal) {
         existingModal.remove();
     }
 
-    // Create modal overlay
     var modalOverlay = document.createElement('div');
     modalOverlay.className = 'password-modal-overlay';
     modalOverlay.innerHTML = 
@@ -901,22 +680,18 @@ function showPasswordModal() {
     
     document.body.appendChild(modalOverlay);
     
-    // Focus on password input
     var passwordInput = document.getElementById('passwordInput');
     passwordInput.focus();
     
-    // Event listeners
     document.getElementById('submitPassword').addEventListener('click', validatePassword);
     document.getElementById('cancelPassword').addEventListener('click', closePasswordModal);
     
-    // Enter key support
     passwordInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             validatePassword();
         }
     });
     
-    // Escape key to close
     var escapeHandler = function(e) {
         if (e.key === 'Escape') {
             closePasswordModal();
@@ -931,24 +706,20 @@ function validatePassword() {
     var enteredPassword = passwordInput.value.trim();
     var passwordError = document.getElementById('passwordError');
     
-    // You can customize this password or make it configurable
-    var correctPassword = 'team'; // Change this to your desired password
+    var correctPassword = 'team2024';
     
     if (enteredPassword === correctPassword) {
-        // Password correct
         localStorage.setItem('planningPoker_authenticated', 'true');
         hidePasswordField();
         closePasswordModal();
         showTemporaryMessage('✅ Authentication successful!');
         focusOnPlayerName();
     } else {
-        // Password incorrect
         passwordError.textContent = '❌ Incorrect password. Please try again.';
         passwordError.style.display = 'block';
         passwordInput.value = '';
         passwordInput.focus();
         
-        // Shake animation for the modal
         var modal = document.querySelector('.password-modal');
         modal.style.animation = 'slideIn 0.5s ease-in-out';
         setTimeout(function() {
@@ -979,7 +750,6 @@ function showPasswordField() {
 }
 
 function focusOnPlayerName() {
-    // Focus on player name field after authentication
     setTimeout(function() {
         var playerNameField = document.getElementById('playerName');
         if (playerNameField) {
@@ -988,7 +758,6 @@ function focusOnPlayerName() {
     }, 100);
 }
 
-// Optional: Add logout functionality
 function logout() {
     localStorage.removeItem('planningPoker_authenticated');
     showPasswordField();
