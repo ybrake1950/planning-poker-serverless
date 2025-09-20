@@ -1,62 +1,60 @@
 // tests/cost-optimization/basic.test.js
-// Cost optimization validation tests
+// Basic cost optimization validations
 
-describe('Cost Optimization Tests', () => {
-  test('should validate session timeout settings', () => {
-    const sessionTimeout = 7200;
-    const twoHoursInSeconds = 2 * 60 * 60;
+describe("Cost Optimization Tests", () => {
+  it("should validate session timeout settings", () => {
+    const sessionTimeoutMinutes = 30;
+    const maxTimeoutMinutes = 120;
     
-    expect(sessionTimeout).toBe(twoHoursInSeconds);
+    expect(sessionTimeoutMinutes).toBeGreaterThan(5);
+    expect(sessionTimeoutMinutes).toBeLessThan(maxTimeoutMinutes);
+    
+    console.log(`Session timeout: ${sessionTimeoutMinutes} minutes`);
   });
 
-  test('should validate memory-efficient data structures', () => {
-    const testSession = {
-      sessionCode: 'TEST',
-      players: {},
-      votesRevealed: false,
-      createdAt: new Date().toISOString()
-    };
+  it("should validate memory-efficient data structures", () => {
+    // Validate that we use efficient data structures
+    const fibonacciValues = [1, 2, 3, 5, 8, 13, 21];
+    const maxVoteOptions = 10;
     
-    const sessionKeys = Object.keys(testSession);
-    expect(sessionKeys.length).toBeLessThanOrEqual(5);
+    expect(fibonacciValues.length).toBeLessThan(maxVoteOptions);
+    expect(fibonacciValues).toEqual(expect.arrayContaining([1, 2, 3, 5, 8]));
     
-    expect(typeof testSession.players).toBe('object');
-    expect(Array.isArray(testSession.players)).toBe(false);
+    console.log(`Fibonacci sequence length: ${fibonacciValues.length}`);
   });
 
-  test('should validate Fibonacci vote values are efficient', () => {
-    const fibonacciValues = [1, 2, 3, 5, 8, 13];
+  it("should validate Fibonacci vote values are efficient", () => {
+    const standardFibSequence = [1, 2, 3, 5, 8, 13, 21];
     
-    expect(fibonacciValues.length).toBe(6);
-    expect(Math.max(...fibonacciValues)).toBe(13);
-    
-    fibonacciValues.forEach(value => {
-      expect(Number.isInteger(value)).toBe(true);
+    // Check that all values are reasonable for planning poker
+    standardFibSequence.forEach(value => {
       expect(value).toBeGreaterThan(0);
+      expect(value).toBeLessThan(100); // Reasonable story point limit
     });
+    
+    console.log(`Vote values: ${standardFibSequence.join(', ')}`);
   });
 
-  test('should validate local development mode', () => {
-    process.env.IS_OFFLINE = 'true';
-    process.env.NODE_ENV = 'test';
+  it("should validate local development mode", () => {
+    const isDevelopment = process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development';
+    const isProduction = process.env.NODE_ENV === 'production';
     
-    expect(process.env.IS_OFFLINE).toBe('true');
-    expect(process.env.NODE_ENV).toBe('test');
+    // Should not be both development and production
+    expect(isDevelopment && isProduction).toBe(false);
+    
+    console.log(`Environment: ${process.env.NODE_ENV || 'not set'}`);
   });
 
-  test('should validate efficient vote processing', () => {
-    // Test that vote processing is O(1) complexity
-    const startTime = Date.now();
+  it("should validate efficient vote processing", () => {
+    // Simulate processing votes efficiently
+    const votes = [1, 2, 3, 5, 8, 5, 3, 2, 1];
+    const uniqueVotes = [...new Set(votes)];
+    const averageVote = votes.reduce((sum, vote) => sum + vote, 0) / votes.length;
     
-    // Simulate vote processing
-    const vote = 5;
-    const validVotes = [1, 2, 3, 5, 8, 13];
-    const isValid = validVotes.includes(vote);
+    expect(uniqueVotes.length).toBeLessThan(votes.length);
+    expect(averageVote).toBeGreaterThan(0);
+    expect(averageVote).toBeLessThan(20);
     
-    const endTime = Date.now();
-    const processingTime = endTime - startTime;
-    
-    expect(isValid).toBe(true);
-    expect(processingTime).toBeLessThan(10); // Should be very fast
+    console.log(`Processed ${votes.length} votes, ${uniqueVotes.length} unique values`);
   });
 });

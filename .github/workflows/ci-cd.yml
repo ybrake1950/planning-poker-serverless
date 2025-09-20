@@ -136,6 +136,7 @@ jobs:
           test-results/
 
   # Job 4: End-to-End Tests
+  # Job 4: End-to-End Tests (Fixed for Ubuntu 24.04)
   e2e-tests:
     name: End-to-End Tests
     runs-on: ubuntu-latest
@@ -156,14 +157,14 @@ jobs:
         cd server && npm ci && cd ..
         cd client && npm ci && cd ..
     
-    - name: Install Puppeteer dependencies
+    - name: Install Puppeteer dependencies (Ubuntu 24.04 compatible)
       run: |
         sudo apt-get update
         sudo apt-get install -y \
           chromium-browser \
           fonts-liberation \
           libappindicator3-1 \
-          libasound2 \
+          libasound2t64 \
           libatk-bridge2.0-0 \
           libdrm2 \
           libgtk-3-0 \
@@ -222,7 +223,7 @@ jobs:
         if [ ! -z "$CLIENT_PID" ]; then
           kill $CLIENT_PID || true
         fi
-
+        
   # Job 5: Security Scan
   security-scan:
     name: Security Scan
