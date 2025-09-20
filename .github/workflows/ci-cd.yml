@@ -536,11 +536,7 @@ jobs:
           lighthouse-report.json
           performance-report.json
 
-# Job 11: Cleanup and Notifications-reports
-        path: |
-          lighthouse-report.json
-          performance-report.json
-
+  # Job 11: Cleanup and Notifications
   cleanup:
     name: Cleanup and Notify
     runs-on: ubuntu-latest
