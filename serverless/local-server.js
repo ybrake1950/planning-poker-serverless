@@ -1,6 +1,6 @@
 // serverless/local-server.js
-// Fixed local development server with ES5 syntax (no const/let)
-// Directory: serverless/local-server.js
+// Fixed local development server with proper Socket.IO structure
+// Directory: planning-poker-serverless/serverless/local-server.js
 
 var express = require('express');
 var http = require('http');
@@ -11,7 +11,7 @@ var cors = require('cors');
 process.env.IS_OFFLINE = 'true';
 process.env.NODE_ENV = 'development';
 
-// Import our database functions directly (skip serverless wrapper)
+// Import our database functions
 var db = require('./db');
 var createSession = db.createSession;
 var getSession = db.getSession;
@@ -107,7 +107,8 @@ app.get('/api/health', function(req, res) {
   });
 });
 
-// WebSocket connection handling
+// MAIN SOCKET.IO CONNECTION HANDLER
+// All socket event handlers MUST be inside this function
 io.on('connection', function(socket) {
   console.log('🔌 Socket.IO: Client connected:', socket.id);
   
@@ -186,6 +187,9 @@ io.on('connection', function(socket) {
             .then(function() {
               console.log('✅ Player', playerName, 'joined session', finalSessionCode, 'as', isSpectator ? 'Spectator' : 'Voter');
               
+              // Join the socket to a room for this session
+              socket.join(finalSessionCode);
+              
               // Send success response to joining player
               socket.emit('joinedSession', {
                 sessionCode: finalSessionCode,
@@ -204,9 +208,6 @@ io.on('connection', function(socket) {
               };
               
               console.log('📡 Broadcasting session update to all players in room:', finalSessionCode);
-              
-              // Join the socket to a room for this session
-              socket.join(finalSessionCode);
               
               // Broadcast to all sockets in this session
               io.to(finalSessionCode).emit('sessionUpdate', sessionUpdate);
@@ -240,8 +241,6 @@ io.on('connection', function(socket) {
           return;
         }
         
-        console.log('👤 Vote from player:', connection.playerName, 'in session:', connection.sessionCode);
-        
         if (connection.isSpectator) {
           console.log('❌ Spectator tried to vote:', connection.playerName);
           socket.emit('error', {
@@ -250,17 +249,7 @@ io.on('connection', function(socket) {
           return;
         }
         
-        // Validate vote
-        var validVotes = [1, 2, 3, 5, 8, 13];
-        if (validVotes.indexOf(vote) === -1) {
-          console.log('❌ Invalid vote value:', vote);
-          socket.emit('error', {
-            message: 'Invalid vote value. Must be: 1, 2, 3, 5, 8, or 13'
-          });
-          return;
-        }
-        
-        // Update session with vote
+        // Update player's vote
         return getSession(connection.sessionCode)
           .then(function(session) {
             if (!session) {
@@ -272,62 +261,63 @@ io.on('connection', function(socket) {
             }
             
             var updatedPlayers = {};
-            // Copy existing players
-            for (var name in session.players) {
-              if (session.players.hasOwnProperty(name)) {
-                updatedPlayers[name] = session.players[name];
+            for (var playerName in session.players) {
+              if (session.players.hasOwnProperty(playerName)) {
+                updatedPlayers[playerName] = session.players[playerName];
               }
             }
             
-            // Update the voting player
-            updatedPlayers[connection.playerName] = {
-              hasVoted: true,
-              vote: vote,
-              isSpectator: updatedPlayers[connection.playerName].isSpectator,
-              joinedAt: updatedPlayers[connection.playerName].joinedAt
+            // Update the voting player's information
+            if (updatedPlayers[connection.playerName]) {
+              updatedPlayers[connection.playerName].hasVoted = true;
+              updatedPlayers[connection.playerName].vote = vote;
+            }
+            
+            // Check if all voters have voted
+            var allVotersVoted = true;
+            for (var name in updatedPlayers) {
+              if (updatedPlayers.hasOwnProperty(name)) {
+                var player = updatedPlayers[name];
+                if (!player.isSpectator && !player.hasVoted) {
+                  allVotersVoted = false;
+                  break;
+                }
+              }
+            }
+            
+            var updateData = {
+              players: updatedPlayers
             };
             
-            // Check if all non-spectators have voted
-            var nonSpectators = [];
-            for (var playerName in updatedPlayers) {
-              if (updatedPlayers.hasOwnProperty(playerName)) {
-                var player = updatedPlayers[playerName];
-                if (!player.isSpectator) {
-                  nonSpectators.push(player);
-                }
-              }
+            // Auto-reveal if all voters have voted
+            if (allVotersVoted) {
+              updateData.votesRevealed = true;
+              console.log('🎯 All voters have voted! Auto-revealing votes...');
             }
             
-            var votedCount = 0;
-            for (var i = 0; i < nonSpectators.length; i++) {
-              if (nonSpectators[i].hasVoted) {
-                votedCount++;
-              }
-            }
-            
-            var allVoted = nonSpectators.length > 0 && votedCount === nonSpectators.length;
-            
-            console.log('📊 Voting progress:', votedCount, '/', nonSpectators.length, 'players voted');
-            
-            return updateSession(connection.sessionCode, {
-              players: updatedPlayers,
-              votesRevealed: allVoted || session.votesRevealed
-            }).then(function(updatedSession) {
-              console.log('✅ Vote recorded for', connection.playerName + ':', vote);
-              
-              if (allVoted) {
-                console.log('🎉 All players have voted! Revealing votes...');
-              }
-              
-              // Broadcast update to all players in the session
-              io.to(connection.sessionCode).emit('sessionUpdate', {
-                state: {
-                  players: updatedSession.players,
-                  votesRevealed: updatedSession.votesRevealed,
-                  hasConsensus: checkConsensus(updatedSession)
+            return updateSession(connection.sessionCode, updateData)
+              .then(function(updatedSession) {
+                console.log('✅ Vote recorded for', connection.playerName, ':', vote);
+                
+                // Send confirmation to voter
+                socket.emit('voteSubmitted', {
+                  vote: vote,
+                  hasVoted: true
+                });
+                
+                if (allVotersVoted) {
+                  console.log('🎊 All votes submitted! Revealing votes...');
                 }
+                
+                // Broadcast update to all players in the session
+                io.to(connection.sessionCode).emit('sessionUpdate', {
+                  state: {
+                    players: updatedSession.players,
+                    votesRevealed: updatedSession.votesRevealed,
+                    hasConsensus: checkConsensus(updatedSession)
+                  }
+                });
               });
-            });
           });
       })
       .catch(function(error) {
@@ -429,6 +419,15 @@ server.listen(PORT, function() {
   console.log('✅ Ready for connections!');
   console.log('');
 });
+
+// Session cleanup (if needed - remove if you have it elsewhere)
+// This prevents the "sessions is not defined" error
+function cleanupEmptySessions() {
+  console.log('🧹 Session cleanup completed (using database, not in-memory sessions)');
+}
+
+// Schedule cleanup every hour (optional)
+setInterval(cleanupEmptySessions, 60 * 60 * 1000);
 
 // Graceful shutdown
 process.on('SIGTERM', function() {

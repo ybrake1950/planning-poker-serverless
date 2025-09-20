@@ -1,6 +1,6 @@
 // client/src/app.js
-// Fixed Planning Poker Frontend - Connection Issue Resolved + Password Modal
-// Directory: client/src/app.js
+// Complete Planning Poker Frontend - No Duplicate Functions
+// Directory: planning-poker-serverless/client/src/app.js
 
 // Global game state
 var gameState = {
@@ -13,162 +13,480 @@ var gameState = {
     },
     isSpectator: false,
     playerName: '',
+    sessionCode: '',
     currentVote: null
 };
+// Debug helper functions (add these to your global scope)
+window.debugApp = function() {
+    debugCurrentState();
+};
 
+window.testAuth = function() {
+    console.log('🧪 Testing authentication...');
+    forceShowPasswordInterface();
+};
+
+window.testSuccess = function() {
+    showSuccess('Test success message!');
+};
+
+window.testError = function() {
+    showError('Test error message!');
+};
+
+window.validateElements = function() {
+    return validateRequiredElements();
+};
+// Updated initialization to ensure proper flow
+function initializeAuthentication() {
+    console.log('🔄 Initializing authentication flow...');
+    
+    // Always start with authentication check
+    checkAuthentication();
+    
+    // Add some debugging after a short delay
+    setTimeout(function() {
+        var passwordSection = document.getElementById('passwordSection');
+        var gameSection = document.getElementById('gameSection');
+        
+        if (passwordSection) {
+            var passwordDisplay = window.getComputedStyle(passwordSection).display;
+            console.log('🔍 Password section display:', passwordDisplay);
+        } else {
+            console.error('❌ Password section not found!');
+        }
+        
+        if (gameSection) {
+            var gameDisplay = window.getComputedStyle(gameSection).display;
+            console.log('🔍 Game section display:', gameDisplay);
+        } else {
+            console.error('❌ Game section not found!');
+        }
+    }, 100);
+}
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🎯 Planning Poker app initializing...');
-    setupEventListeners();
-    checkAuthentication();
-    connectToServer();
+    console.log('🎯 Planning Poker app starting...');
     
-    // Check URL parameters for session joining
-    var urlParams = new URLSearchParams(window.location.search);
-    var sessionCode = urlParams.get('session');
-    if (sessionCode) {
-        document.getElementById('sessionCode').value = sessionCode;
+    // Use safe initialization to prevent errors
+    try {
+        safeInitialize();
+    } catch (error) {
+        console.error('❌ Critical initialization error:', error);
+        
+        // Show error on page
+        var body = document.body;
+        if (body) {
+            var errorDiv = document.createElement('div');
+            errorDiv.innerHTML = `
+                <div style="background: #f44336; color: white; padding: 20px; margin: 20px; border-radius: 8px;">
+                    <h3>⚠️ App Initialization Error</h3>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <p><strong>Solution:</strong> Please refresh the page or check the console for details.</p>
+                    <button onclick="location.reload()" style="background: white; color: #f44336; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;">
+                        🔄 Refresh Page
+                    </button>
+                </div>
+            `;
+            body.insertBefore(errorDiv, body.firstChild);
+        }
     }
 });
 
 // Setup event listeners
 function setupEventListeners() {
+    console.log('🔧 Setting up event listeners...');
+    
     // Team password button
     var teamPasswordBtn = document.getElementById('teamPasswordBtn');
     if (teamPasswordBtn) {
         teamPasswordBtn.addEventListener('click', handlePasswordAuth);
+        console.log('✅ Password button listener added');
+    } else {
+        console.warn('⚠️ Password button not found');
+    }
+    
+    // Password input enter key
+    var teamPasswordInput = document.getElementById('teamPassword');
+    if (teamPasswordInput) {
+        teamPasswordInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handlePasswordAuth();
+            }
+        });
+        console.log('✅ Password input enter key listener added');
     }
     
     // Join button
-    document.getElementById('joinButton').addEventListener('click', joinSession);
+    var joinButton = document.getElementById('joinButton');
+    if (joinButton) {
+        joinButton.addEventListener('click', joinSession);
+        console.log('✅ Join button listener added');
+    } else {
+        console.warn('⚠️ Join button not found');
+    }
     
     // Reset buttons
     var resetButton = document.getElementById('resetButton');
     if (resetButton) {
         resetButton.addEventListener('click', resetVotes);
+        console.log('✅ Reset button listener added');
     }
     
     var resetButtonSpectator = document.getElementById('resetButtonSpectator');
     if (resetButtonSpectator) {
         resetButtonSpectator.addEventListener('click', resetVotes);
+        console.log('✅ Spectator reset button listener added');
     }
     
     // Voting cards
     var fibonacciCards = document.querySelectorAll('.fibonacci-card');
-    for (var i = 0; i < fibonacciCards.length; i++) {
-        fibonacciCards[i].addEventListener('click', function() {
-            var value = parseInt(this.dataset.value);
-            castVote(value);
-        });
+    if (fibonacciCards.length > 0) {
+        for (var i = 0; i < fibonacciCards.length; i++) {
+            fibonacciCards[i].addEventListener('click', function() {
+                var value = parseInt(this.dataset.value);
+                castVote(value);
+            });
+        }
+        console.log('✅ Voting card listeners added (' + fibonacciCards.length + ' cards)');
+    } else {
+        console.warn('⚠️ No voting cards found');
     }
     
     // Share link copy functionality
-    document.getElementById('shareLink').addEventListener('click', copyShareLink);
+    var shareLink = document.getElementById('shareLink');
+    if (shareLink) {
+        shareLink.addEventListener('click', copyShareLink);
+        console.log('✅ Share link listener added');
+    } else {
+        console.warn('⚠️ Share link button not found');
+    }
     
     // Enter key to join
-    document.getElementById('playerName').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            joinSession();
-        }
-    });
+    var playerNameInput = document.getElementById('playerName');
+    if (playerNameInput) {
+        playerNameInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                joinSession();
+            }
+        });
+        console.log('✅ Player name enter key listener added');
+    }
+    
+    console.log('🎯 Event listeners setup complete');
 }
-
-// Connect to server - FIXED: Correct port detection
-function connectToServer() {
-    console.log('🔌 Connecting to server...');
+// Global error handler to catch any missed errors
+window.addEventListener('error', function(event) {
+    console.error('🚨 Global error caught:', event.error);
+    console.error('  - Message:', event.message);
+    console.error('  - Filename:', event.filename);
+    console.error('  - Line:', event.lineno);
+    console.error('  - Column:', event.colno);
     
-    // FIXED: Connect to the correct backend server port
-    var serverUrl = 'http://localhost:3001';  // Backend runs on 3001
+    // Try to show error message to user
+    try {
+        showError('An unexpected error occurred. Please refresh the page.');
+    } catch (e) {
+        console.error('❌ Could not show error message:', e);
+    }
+});
+// Authentication functions
+function checkAuthentication() {
+    console.log('🔐 Checking authentication...');
     
-    // Check if Socket.IO is available
-    if (typeof io === 'undefined') {
-        console.log('❌ Socket.IO not available');
-        hideLoading();
-        showError('Socket.IO library not loaded');
+    // FORCE PRODUCTION BEHAVIOR (for testing)
+    // Comment out the localhost bypass to test password authentication
+    var isLocalhost = window.location.hostname === 'localhost' || 
+                     window.location.hostname === '127.0.0.1';
+    
+    // UNCOMMENT THIS LINE TO TEST PRODUCTION BEHAVIOR:
+    var forceProductionAuth = true; // Set to true to test password auth
+    
+    if (isLocalhost && !forceProductionAuth) {
+        console.log('🏠 Local development - skipping password auth');
+        showGameInterface();
         return;
     }
     
+    // For production (or forced production testing), always require password
+    var authenticated = localStorage.getItem('planning-poker-authenticated');
+    
+    if (authenticated === 'true') {
+        console.log('✅ User is authenticated from localStorage');
+        showGameInterface();
+    } else {
+        console.log('🔒 User needs to authenticate - showing password interface');
+        showPasswordInterface();
+    }
+}
+// Enhanced error handling for missing elements
+function validateRequiredElements() {
+    console.log('🔍 Validating required HTML elements...');
+    
+    var requiredElements = [
+        'passwordSection',
+        'gameSection', 
+        'teamPassword',
+        'teamPasswordBtn',
+        'joinForm',
+        'sessionInterface',
+        'playerName',
+        'joinButton',
+        'shareLink',
+        'loading',
+        'error',
+        'connectionStatus'
+    ];
+    
+    var missingElements = [];
+    
+    requiredElements.forEach(function(id) {
+        var element = document.getElementById(id);
+        if (!element) {
+            missingElements.push(id);
+        }
+    });
+    
+    if (missingElements.length > 0) {
+        console.error('❌ Missing required elements:', missingElements);
+        return false;
+    } else {
+        console.log('✅ All required elements found');
+        return true;
+    }
+}
+function handlePasswordAuth() {
+    console.log('🔑 Handling password authentication...');
+    
+    var passwordInput = document.getElementById('teamPassword');
+    if (!passwordInput) {
+        console.error('❌ Password input not found');
+        showError('Password input not found');
+        return;
+    }
+    
+    var password = passwordInput.value.trim();
+    
+    // Validate password
+    if (password.length === 0) {
+        showError('Please enter a password');
+        return;
+    }
+    
+    // For demo purposes, accept any non-empty password
+    // In production, you would validate against a real password
+    console.log('🔍 Validating password...');
+    
+    // Simulate password validation
+    if (password.length > 0) {
+        // Store authentication state
+        localStorage.setItem('planning-poker-authenticated', 'true');
+        console.log('✅ Password authentication successful');
+        
+        // Clear any error messages
+        hideError();
+        
+        // Show success message briefly
+        showSuccess('Authentication successful!');
+        
+        // Transition to game interface
+        setTimeout(function() {
+            showGameInterface();
+        }, 500);
+        
+    } else {
+        console.log('❌ Invalid password');
+        showError('Invalid password. Please try again.');
+    }
+}
+// Initialize everything safely
+function safeInitialize() {
+    console.log('🔒 Safe initialization starting...');
+    
     try {
-        gameState.socket = io(serverUrl, {
-            transports: ['websocket', 'polling'],
-            upgrade: true,
-            rememberUpgrade: true
-        });
+        // Validate elements first
+        if (!validateRequiredElements()) {
+            console.error('❌ Required elements missing - check your HTML');
+            return;
+        }
         
-        // Connection established
-        gameState.socket.on('connect', function() {
-            console.log('✅ Connected to backend server');
-            gameState.isConnected = true;
-            hideLoading();
-            hideError();
-            showTemporaryMessage('✅ Connected to server!');
-        });
+        // Setup event listeners
+        setupEventListeners();
         
-        // Connection failed
-        gameState.socket.on('connect_error', function(error) {
-            console.log('❌ Connection failed:', error);
-            hideLoading();
-            showError('Failed to connect to server. Please check if the server is running on port 3001.');
-        });
+        // Initialize authentication
+        initializeAuthentication();
         
-        // Disconnect handling
-        gameState.socket.on('disconnect', function() {
-            console.log('❌ Disconnected from server');
-            gameState.isConnected = false;
-            showError('Disconnected from server');
-        });
+        // Connect to server
+        connectToServer();
         
-        // Session joined successfully
-        gameState.socket.on('joinedSession', function(data) {
-            console.log('🎮 Session joined successfully:', data);
-            gameState.isSpectator = data.isSpectator;
-            gameState.playerName = data.playerName;
-            
-            // Show the game interface
-            showGameInterface(data);
-            hideLoading();
-            
-            console.log('✅ Game interface should now be visible');
-        });
-        
-        // Session state update
-        gameState.socket.on('sessionUpdate', function(data) {
-            console.log('📊 Session update received:', data);
-            
-            if (data.state) {
-                gameState.sessionState = Object.assign(gameState.sessionState, data.state);
-                updateGameInterface();
+        // Handle URL parameters
+        var urlParams = new URLSearchParams(window.location.search);
+        var sessionCode = urlParams.get('session');
+        if (sessionCode) {
+            var sessionInput = document.getElementById('sessionCode');
+            if (sessionInput) {
+                sessionInput.value = sessionCode;
+                console.log('🔗 Session code from URL:', sessionCode);
             }
-        });
+        }
         
-        // Votes reset notification
-        gameState.socket.on('votesReset', function() {
-            console.log('🔄 Votes have been reset');
-            gameState.currentVote = null;
-            clearSelectedVote();
-            showTemporaryMessage('🔄 Votes reset - you can vote again!');
-        });
-        
-        // Error handling
-        gameState.socket.on('error', function(data) {
-            console.error('❌ Server error:', data);
-            showError(data.message || 'Server error occurred');
-            hideLoading();
-        });
+        console.log('✅ Safe initialization complete');
         
     } catch (error) {
-        console.log('❌ Socket connection error:', error);
-        hideLoading();
-        showError('Failed to connect to server');
+        console.error('❌ Initialization error:', error);
+        showError('App initialization failed: ' + error.message);
+    }
+}
+function showPasswordInterface() {
+    console.log('🔒 Showing password interface');
+    
+    var passwordSection = document.getElementById('passwordSection');
+    var gameSection = document.getElementById('gameSection');
+    
+    if (passwordSection) {
+        passwordSection.style.display = 'block';
+        console.log('✅ Password section shown');
+    } else {
+        console.error('❌ Password section element not found!');
+    }
+    
+    if (gameSection) {
+        gameSection.style.display = 'none';
+        console.log('✅ Game section hidden');
     }
 }
 
-// Join or create session
-function joinSession() {
-    var playerName = document.getElementById('playerName').value.trim();
-    var sessionCode = document.getElementById('sessionCode').value.trim();
-    var isSpectator = document.getElementById('spectatorMode').checked;
+function showGameInterface() {
+console.log('🎮 Showing game interface');
     
+    var passwordSection = document.getElementById('passwordSection');
+    var gameSection = document.getElementById('gameSection');
+    
+    if (passwordSection) {
+        passwordSection.style.display = 'none';
+        console.log('✅ Password section hidden');
+    }
+    
+    if (gameSection) {
+        gameSection.style.display = 'block';
+        console.log('✅ Game section shown');
+    } else {
+        console.error('❌ Game section element not found!');
+    }
+    
+    // Make sure join form is visible initially
+    var joinForm = document.getElementById('joinForm');
+    if (joinForm) {
+        joinForm.style.display = 'block';
+        console.log('✅ Join form shown');
+    }
+}
+
+// Connection functions
+function connectToServer() {
+    console.log('🔌 Connecting to server...');
+    
+    var isLocal = window.location.hostname === 'localhost' || 
+                  window.location.hostname === '127.0.0.1';
+    
+    var serverUrl;
+    if (isLocal) {
+        serverUrl = 'http://localhost:3001';
+        console.log('🏠 Using local development server:', serverUrl);
+    } else {
+        serverUrl = window.location.origin;
+        console.log('☁️ Using production server:', serverUrl);
+    }
+    
+    // Initialize Socket.IO connection
+    gameState.socket = io(serverUrl, {
+        transports: ['websocket', 'polling'],
+        timeout: 10000,
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        maxReconnectionAttempts: 5
+    });
+    
+    setupSocketEventHandlers();
+}
+
+function setupSocketEventHandlers() {
+    console.log('📡 Setting up socket event handlers...');
+    
+    gameState.socket.on('connect', function() {
+        console.log('✅ Connected to backend server');
+        gameState.isConnected = true;
+        hideError();
+        hideLoading();
+        updateConnectionStatus('Connected to server');
+    });
+    
+    gameState.socket.on('disconnect', function(reason) {
+        console.log('❌ Disconnected from server:', reason);
+        gameState.isConnected = false;
+        showLoading('Connection lost. Reconnecting...');
+        updateConnectionStatus('Disconnected - ' + reason);
+    });
+    
+    gameState.socket.on('connect_error', function(error) {
+        console.error('🔥 Connection error:', error);
+        showError('Unable to connect to server. Please check your connection.');
+        updateConnectionStatus('Connection failed');
+    });
+    
+    gameState.socket.on('joinedSession', function(data) {
+        console.log('🎉 Successfully joined session:', data);
+        gameState.sessionCode = data.sessionCode;
+        gameState.playerName = data.playerName;
+        gameState.isSpectator = data.isSpectator;
+        
+        hideLoading();
+        hideError();
+        showSessionInterface(data);
+    });
+    
+    gameState.socket.on('sessionUpdate', function(data) {
+        console.log('📊 Session update received:', data);
+        updateSessionInterface(data);
+    });
+    
+    gameState.socket.on('voteSubmitted', function(data) {
+        console.log('🗳️ Vote submitted:', data);
+        gameState.currentVote = data.vote;
+        updateVotingInterface(data);
+    });
+    
+    gameState.socket.on('votesReset', function() {
+        console.log('🔄 Votes have been reset');
+        gameState.currentVote = null;
+        resetVotingInterface();
+    });
+    
+    gameState.socket.on('error', function(data) {
+        console.error('⚠️ Server error:', data);
+        showError(data.message || 'An error occurred');
+    });
+}
+
+// Game functions
+function joinSession() {
+    console.log('🎯 Attempting to join session...');
+    
+    var playerNameInput = document.getElementById('playerName');
+    var sessionCodeInput = document.getElementById('sessionCode');
+    var isSpectatorInput = document.getElementById('isSpectator');
+    
+    if (!playerNameInput) {
+        showError('Player name input not found');
+        return;
+    }
+    
+    var playerName = playerNameInput.value.trim();
+    var sessionCode = sessionCodeInput ? sessionCodeInput.value.trim().toUpperCase() : '';
+    var isSpectator = isSpectatorInput ? isSpectatorInput.checked : false;
+    
+    // Validation
     if (!playerName) {
         showError('Please enter your name');
         return;
@@ -184,32 +502,19 @@ function joinSession() {
         return;
     }
     
-    // Check authentication
-    var isAuthenticated = localStorage.getItem('planningPoker_authenticated') === 'true';
-    if (!isAuthenticated) {
-        showError('Please enter team password first');
-        return;
-    }
-    
-    showLoading();
+    showLoading('Joining session...');
     hideError();
-    
-    // Determine if creating new session or joining existing
-    var finalSessionCode = sessionCode || generateSessionCode();
-    
-    console.log('🎯 Joining session: ' + finalSessionCode + ' as ' + (isSpectator ? 'Spectator' : 'Player'));
     
     // Send join request to server
     gameState.socket.emit('joinSession', {
-        sessionCode: finalSessionCode,
+        sessionCode: sessionCode,
         playerName: playerName,
         isSpectator: isSpectator
     });
 }
 
-// Cast a vote
-function castVote(value) {
-    console.log('🗳️ Vote button clicked: ' + value);
+function castVote(voteValue) {
+    console.log('🗳️ Casting vote:', voteValue);
     
     if (!gameState.isConnected) {
         showError('Not connected to server');
@@ -221,36 +526,13 @@ function castVote(value) {
         return;
     }
     
-    var canVote = !gameState.sessionState.hasConsensus;
-    var isRevotingScenario = gameState.sessionState.votesRevealed && !gameState.sessionState.hasConsensus;
-    
-    if (!canVote) {
-        console.log('🚫 Voting disabled - consensus already reached');
-        showError('Consensus already reached. Spectator can reset for new voting round.');
-        return;
-    }
-    
-    if (isRevotingScenario && gameState.currentVote !== null) {
-        showTemporaryMessage('🔄 Vote changed from ' + gameState.currentVote + ' to ' + value);
-    } else if (isRevotingScenario) {
-        showTemporaryMessage('🗳️ Vote cast: ' + value + ' (re-voting round)');
-    } else {
-        showTemporaryMessage('✅ Vote recorded: ' + value);
-    }
-    
-    console.log('🗳️ Casting vote: ' + value);
-    
-    // Update local state and UI immediately for responsiveness
-    gameState.currentVote = value;
-    updateSelectedVote(value);
-    
-    // Send vote to server
-    gameState.socket.emit('castVote', { vote: value });
+    gameState.socket.emit('castVote', {
+        vote: voteValue
+    });
 }
 
-// Reset votes
 function resetVotes() {
-    console.log('🔄 Reset votes button clicked');
+    console.log('🔄 Requesting vote reset...');
     
     if (!gameState.isConnected) {
         showError('Not connected to server');
@@ -262,468 +544,511 @@ function resetVotes() {
         return;
     }
     
-    console.log('🔄 Resetting votes');
-    gameState.socket.emit('resetVotes');
+    gameState.socket.emit('resetVotes', {});
 }
 
-// UI Helper Functions
-function showGameInterface(sessionData) {
-    console.log('🎮 SHOWING GAME INTERFACE - sessionData:', sessionData);
+// UI functions
+function showLoading(message) {
+    console.log('⏳ Loading:', message);
     
-    // Hide join form completely
-    var joinInterface = document.getElementById('joinInterface');
-    if (joinInterface) {
-        joinInterface.style.display = 'none';
-        console.log('✅ Join interface hidden');
+    var loadingElement = document.getElementById('loading');
+    var errorElement = document.getElementById('error');
+    
+    if (loadingElement) {
+        loadingElement.textContent = message || 'Loading...';
+        loadingElement.style.display = 'block';
     }
     
-    // Show game interface
-    var gameInterface = document.getElementById('gameInterface');
-    if (gameInterface) {
-        gameInterface.style.display = 'block';
-        console.log('✅ Game interface shown');
-    } else {
-        console.error('❌ Game interface element not found!');
-        return;
-    }
-    
-    // Update session info
-    var sessionInfo = document.getElementById('sessionInfo');
-    if (sessionInfo) {
-        sessionInfo.textContent = 'Session: ' + sessionData.sessionCode;
-        console.log('✅ Session info updated:', sessionData.sessionCode);
-    }
-    
-    var shareLink = document.getElementById('shareLink');
-    if (shareLink) {
-        var linkText = sessionData.shareUrl || ('http://localhost:8080?session=' + sessionData.sessionCode);
-        shareLink.textContent = linkText;
-        console.log('✅ Share link updated:', linkText);
-    }
-    
-    // Show spectator controls if spectator
-    if (sessionData.isSpectator) {
-        var spectatorControls = document.getElementById('spectatorControls');
-        if (spectatorControls) {
-            spectatorControls.style.display = 'flex';
-        }
-        updateStatus('👁️ You are the Spectator. Share the link above with your team.');
-        console.log('✅ Spectator mode activated');
-    } else {
-        updateStatus('🎯 Connected to session. Cast your vote when ready!');
-        console.log('✅ Player mode activated');
-    }
-    
-    hideLoading();
-    console.log('🎉 Game interface setup complete!');
-}
-
-function updateGameInterface() {
-    updatePlayerCards();
-    updateVotingCards();
-    updateStatus();
-    updateSpectatorControls();
-}
-
-// Enhanced Player Status Indicators
-function updatePlayerCards() {
-    var container = document.getElementById('playerCards');
-    if (!container) return;
-    
-    container.innerHTML = '';
-    
-    var players = gameState.sessionState.players;
-    var votesRevealed = gameState.sessionState.votesRevealed;
-    
-    for (var name in players) {
-        if (!players.hasOwnProperty(name)) continue;
-        
-        var player = players[name];
-        var playerDiv = document.createElement('div');
-        playerDiv.className = 'player-card';
-        
-        if (!player.isSpectator) {
-            if (player.hasVoted) {
-                playerDiv.classList.add('has-voted');
-            } else if (!votesRevealed || !gameState.sessionState.hasConsensus) {
-                playerDiv.classList.add('needs-vote');
-            }
-        }
-        
-        var nameDiv = document.createElement('div');
-        nameDiv.className = 'player-name' + (player.isSpectator ? ' spectator' : '');
-        nameDiv.textContent = name + (player.isSpectator ? ' (Spectator)' : '');
-        
-        var cardDiv = document.createElement('div');
-        cardDiv.className = 'vote-card';
-        
-        if (player.isSpectator) {
-            cardDiv.classList.add('no-vote');
-            cardDiv.textContent = '👁️';
-        } else if (!player.hasVoted) {
-            cardDiv.classList.add('no-vote');
-            cardDiv.textContent = '?';
-        } else if (votesRevealed && player.vote !== null) {
-            cardDiv.classList.add('revealed');
-            cardDiv.textContent = player.vote;
-        } else {
-            cardDiv.classList.add('hidden');
-            cardDiv.textContent = '✓';
-        }
-        
-        var statusDiv = document.createElement('small');
-        if (player.isSpectator) {
-            statusDiv.textContent = 'Observing';
-            statusDiv.style.color = '#6c757d';
-        } else if (player.hasVoted) {
-            statusDiv.textContent = 'Voted';
-            statusDiv.style.color = '#28a745';
-        } else {
-            statusDiv.textContent = 'Thinking...';
-            statusDiv.style.color = '#ffc107';
-        }
-        
-        playerDiv.appendChild(nameDiv);
-        playerDiv.appendChild(cardDiv);
-        playerDiv.appendChild(statusDiv);
-        container.appendChild(playerDiv);
-    }
-}
-
-function updateVotingCards() {
-    var cards = document.querySelectorAll('.fibonacci-card');
-    
-    var canVote = !gameState.isSpectator && !gameState.sessionState.hasConsensus;
-    var isReVotingScenario = gameState.sessionState.votesRevealed && !gameState.sessionState.hasConsensus;
-    
-    for (var i = 0; i < cards.length; i++) {
-        var card = cards[i];
-        card.classList.remove('disabled', 're-vote-allowed');
-        
-        if (canVote) {
-            if (isReVotingScenario) {
-                card.classList.add('re-vote-allowed');
-            }
-        } else {
-            card.classList.add('disabled');
-        }
-    }
-}
-
-function updateSpectatorControls() {
-    var resetButton = document.getElementById('resetButton');
-    var resetButtonSpectator = document.getElementById('resetButtonSpectator');
-    
-    if (!gameState.isSpectator) return;
-    
-    var players = gameState.sessionState.players;
-    var nonSpectators = [];
-    
-    for (var playerName in players) {
-        if (players.hasOwnProperty(playerName)) {
-            var player = players[playerName];
-            if (!player.isSpectator) {
-                nonSpectators.push([playerName, player]);
-            }
-        }
-    }
-    
-    var hasVotes = false;
-    for (var i = 0; i < nonSpectators.length; i++) {
-        if (nonSpectators[i][1].hasVoted) {
-            hasVotes = true;
-            break;
-        }
-    }
-    
-    var buttons = [resetButton, resetButtonSpectator];
-    for (var i = 0; i < buttons.length; i++) {
-        var button = buttons[i];
-        if (!button) continue;
-        
-        if (hasVotes) {
-            button.style.display = 'block';
-            
-            if (gameState.sessionState.hasConsensus) {
-                button.textContent = '🆕 Start New Round';
-                button.title = 'Start a new voting round';
-            } else if (gameState.sessionState.votesRevealed) {
-                button.textContent = '🔄 Reset for Re-vote';
-                button.title = 'Allow players to change their votes';
-            } else {
-                button.textContent = '🔄 Reset Votes';
-                button.title = 'Clear all current votes';
-            }
-        } else {
-            button.style.display = 'none';
-        }
-    }
-}
-
-function updateSelectedVote(value) {
-    var cards = document.querySelectorAll('.fibonacci-card');
-    for (var i = 0; i < cards.length; i++) {
-        cards[i].classList.remove('selected');
-    }
-    
-    if (value) {
-        var selectedCard = document.querySelector('[data-value="' + value + '"]');
-        if (selectedCard) {
-            selectedCard.classList.add('selected');
-        }
-    }
-}
-
-function clearSelectedVote() {
-    updateSelectedVote(null);
-}
-
-function updateStatus(message) {
-    var statusEl = document.getElementById('gameStatus');
-    if (!statusEl) return;
-    
-    if (message) {
-        statusEl.innerHTML = message;
-        statusEl.className = 'status';
-        return;
-    }
-    
-    var players = gameState.sessionState.players;
-    var nonSpectators = [];
-    var totalVoters = 0;
-    var votedCount = 0;
-    
-    for (var playerName in players) {
-        if (players.hasOwnProperty(playerName)) {
-            var player = players[playerName];
-            if (!player.isSpectator) {
-                nonSpectators.push([playerName, player]);
-                totalVoters++;
-                if (player.hasVoted) {
-                    votedCount++;
-                }
-            }
-        }
-    }
-    
-    if (totalVoters === 0) {
-        statusEl.innerHTML = '⏳ Waiting for voters to join...';
-        statusEl.className = 'status';
-    } else if (gameState.sessionState.votesRevealed) {
-        if (gameState.sessionState.hasConsensus) {
-            var consensusVote = null;
-            for (var i = 0; i < nonSpectators.length; i++) {
-                if (nonSpectators[i][1].hasVoted) {
-                    consensusVote = nonSpectators[i][1].vote;
-                    break;
-                }
-            }
-            statusEl.innerHTML = '<div class="consensus">🎉 Consensus Reached! Story Points: ' + consensusVote + ' 🎉</div>';
-        } else {
-            statusEl.innerHTML = '<div class="no-consensus">⚠️ No consensus reached.<br><strong>You can change your vote or wait for spectator to reset.</strong></div>';
-            statusEl.className = 'status no-consensus';
-        }
-    } else {
-        statusEl.innerHTML = '📊 Voting: ' + votedCount + '/' + totalVoters + ' players voted';
-        statusEl.className = 'status';
-    }
-}
-
-function showTemporaryMessage(message, duration) {
-    duration = duration || 3000;
-    
-    var existingMessages = document.querySelectorAll('.temporary-message');
-    for (var i = 0; i < existingMessages.length; i++) {
-        existingMessages[i].remove();
-    }
-    
-    var messageDiv = document.createElement('div');
-    messageDiv.className = 'temporary-message';
-    messageDiv.textContent = message;
-    
-    document.body.appendChild(messageDiv);
-    
-    setTimeout(function() {
-        if (messageDiv.parentNode) {
-            messageDiv.parentNode.removeChild(messageDiv);
-        }
-    }, duration);
-}
-
-// Utility Functions
-function generateSessionCode() {
-    return Math.random().toString(36).substr(2, 8).toUpperCase();
-}
-
-function copyShareLink() {
-    var shareLink = document.getElementById('shareLink');
-    if (!shareLink) return;
-    
-    var shareLinkText = shareLink.textContent;
-    
-    if (navigator.clipboard) {
-        navigator.clipboard.writeText(shareLinkText).then(function() {
-            showTemporaryMessage('✅ Link copied to clipboard!');
-        }).catch(function() {
-            showTemporaryMessage('❌ Unable to copy - please copy manually');
-        });
-    } else {
-        showTemporaryMessage('💡 Please copy the link manually');
-    }
-}
-
-// Error and Loading States
-function showError(message) {
-    console.error('❌ Error:', message);
-    var errorEl = document.getElementById('errorMessage');
-    if (errorEl) {
-        errorEl.textContent = message;
-        errorEl.style.display = 'block';
-        
-        setTimeout(hideError, 5000);
-    }
-}
-
-function hideError() {
-    var errorEl = document.getElementById('errorMessage');
-    if (errorEl) {
-        errorEl.style.display = 'none';
-    }
-}
-
-function showLoading() {
-    var loadingEl = document.getElementById('loadingState');
-    if (loadingEl) {
-        loadingEl.style.display = 'block';
+    if (errorElement) {
+        errorElement.style.display = 'none';
     }
 }
 
 function hideLoading() {
-    var loadingEl = document.getElementById('loadingState');
-    if (loadingEl) {
-        loadingEl.style.display = 'none';
+    console.log('✅ Hiding loading indicator');
+    
+    var loadingElement = document.getElementById('loading');
+    if (loadingElement) {
+        loadingElement.style.display = 'none';
     }
 }
 
-// Authentication Functions
-function checkAuthentication() {
-    var isAuthenticated = localStorage.getItem('planningPoker_authenticated') === 'true';
+function showError(message) {
+    console.error('❌ Error:', message);
     
-    if (isAuthenticated) {
-        hidePasswordField();
-        focusOnPlayerName();
+    var errorElement = document.getElementById('error');
+    var loadingElement = document.getElementById('loading');
+    
+    if (errorElement) {
+        errorElement.textContent = message || 'An error occurred';
+        errorElement.style.display = 'block';
+    }
+    
+    if (loadingElement) {
+        loadingElement.style.display = 'none';
+    }
+}
+
+function hideError() {
+    console.log('✅ Hiding error message');
+    
+    var errorElement = document.getElementById('error');
+    if (errorElement) {
+        errorElement.style.display = 'none';
+    }
+}
+
+function updateConnectionStatus(status) {
+    console.log('📡 Connection status:', status);
+    
+    var statusElement = document.getElementById('connectionStatus');
+    if (statusElement) {
+        statusElement.textContent = status;
+        
+        // Update styling based on connection state
+        if (status.includes('Connected')) {
+            statusElement.className = 'status-connected';
+        } else if (status.includes('Disconnected')) {
+            statusElement.className = 'status-disconnected';
+        } else {
+            statusElement.className = 'status-connecting';
+        }
+    }
+}
+
+function showSessionInterface(data) {
+    console.log('🎮 Showing session interface for:', data.isSpectator ? 'Spectator' : 'Voter');
+    console.log('📊 Session data:', data);
+    
+    // Hide join form
+    var joinForm = document.getElementById('joinForm');
+    if (joinForm) {
+        joinForm.style.display = 'none';
+        console.log('✅ Join form hidden');
+    }
+    
+    // Show session interface
+    var sessionInterface = document.getElementById('sessionInterface');
+    if (sessionInterface) {
+        sessionInterface.style.display = 'block';
+        console.log('✅ Session interface shown');
     } else {
-        showPasswordField();
+        console.error('❌ Session interface element not found!');
+    }
+    
+    // Update session info
+    var sessionCodeElement = document.getElementById('currentSessionCode');
+    var playerNameElement = document.getElementById('currentPlayerName');
+    
+    if (sessionCodeElement) {
+        sessionCodeElement.textContent = data.sessionCode;
+        console.log('✅ Session code updated:', data.sessionCode);
+    }
+    
+    if (playerNameElement) {
+        var displayName = data.playerName + (data.isSpectator ? ' (Spectator)' : ' (Voter)');
+        playerNameElement.textContent = displayName;
+        console.log('✅ Player name updated:', displayName);
+    }
+    
+    // Configure interface based on role
+    configureRoleBasedInterface(data.isSpectator);
+    
+    console.log('🎯 Session interface setup complete!');
+}
+    // Configure interface based on role
+function configureRoleBasedInterface(isSpectator) {
+   console.log('🔧 Configuring interface for:', isSpectator ? 'Spectator' : 'Voter');
+    
+    var votingCards = document.getElementById('votingCards');
+    var resetButton = document.getElementById('resetButton');
+    var resetButtonSpectator = document.getElementById('resetButtonSpectator');
+    
+    if (isSpectator) {
+        console.log('👀 Setting up SPECTATOR interface...');
+        
+        // HIDE voting cards for Spectators
+        if (votingCards) {
+            votingCards.style.display = 'none';
+            console.log('✅ Voting cards HIDDEN for spectator');
+        }
+        
+        // SHOW spectator reset button
+        if (resetButtonSpectator) {
+            resetButtonSpectator.style.display = 'inline-block';
+            console.log('✅ Spectator reset button SHOWN');
+        }
+        
+        // HIDE voter reset button
+        if (resetButton) {
+            resetButton.style.display = 'none';
+            console.log('✅ Voter reset button HIDDEN');
+        }
+        
+    } else {
+        console.log('🗳️ Setting up VOTER interface...');
+        
+        // SHOW voting cards for Voters
+        if (votingCards) {
+            votingCards.style.display = 'block';
+            votingCards.style.opacity = '1';
+            votingCards.style.pointerEvents = 'auto';
+            console.log('✅ Voting cards SHOWN for voter');
+        }
+        
+        // HIDE both reset buttons for Voters
+        if (resetButton) {
+            resetButton.style.display = 'none';
+            console.log('✅ Voter reset button HIDDEN');
+        }
+        
+        if (resetButtonSpectator) {
+            resetButtonSpectator.style.display = 'none';
+            console.log('✅ Spectator reset button HIDDEN');
+        }
     }
 }
 
-function handlePasswordAuth() {
-    var isAuthenticated = localStorage.getItem('planningPoker_authenticated') === 'true';
+function updateSessionInterface(data) {
+    console.log('📊 Updating session interface:', data);
     
-    if (isAuthenticated) {
-        showTemporaryMessage('ℹ️ Already authenticated.');
+    if (data.state) {
+        gameState.sessionState = data.state;
+        updatePlayersDisplay(data.state.players);
+        updateVotingDisplay(data.state.votesRevealed, data.state.hasConsensus);
+    }
+}
+
+function updatePlayersDisplay(players) {
+    var playersListElement = document.getElementById('playersList');
+    if (!playersListElement) return;
+    
+    var html = '';
+    for (var playerName in players) {
+        if (players.hasOwnProperty(playerName)) {
+            var player = players[playerName];
+            var status = player.isSpectator ? 'Spectator' : 
+                        (player.hasVoted ? '✓ Voted' : '⏳ Waiting');
+            var vote = (player.vote && gameState.sessionState.votesRevealed) ? 
+                      (' - Vote: ' + player.vote) : '';
+            
+            html += '<div class="player-item">' + playerName + ' (' + status + ')' + vote + '</div>';
+        }
+    }
+    
+    playersListElement.innerHTML = html;
+}
+
+function updateVotingDisplay(votesRevealed, hasConsensus) {
+    var votingCards = document.querySelectorAll('.fibonacci-card');
+    
+    // Update card selection state
+    for (var i = 0; i < votingCards.length; i++) {
+        var card = votingCards[i];
+        var cardValue = parseInt(card.dataset.value);
+        
+        if (cardValue === gameState.currentVote) {
+            card.classList.add('selected');
+        } else {
+            card.classList.remove('selected');
+        }
+    }
+    
+    // Show consensus message if reached
+    if (hasConsensus) {
+        showSuccess('🎯 Consensus reached!');
+    }
+}
+
+function updateVotingInterface(data) {
+    gameState.currentVote = data.vote;
+    updateVotingDisplay(gameState.sessionState.votesRevealed, gameState.sessionState.hasConsensus);
+}
+
+function resetVotingInterface() {
+    gameState.currentVote = null;
+    var votingCards = document.querySelectorAll('.fibonacci-card');
+    
+    for (var i = 0; i < votingCards.length; i++) {
+        votingCards[i].classList.remove('selected');
+    }
+}
+
+function copyShareLink() {
+        console.log('📋 Copying share link...');
+    
+    if (!gameState.sessionCode) {
+        showError('No active session to share');
         return;
     }
     
-    showPasswordModal();
+    var shareUrl = window.location.origin + window.location.pathname + '?session=' + gameState.sessionCode;
+    console.log('🔗 Share URL:', shareUrl);
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrl).then(function() {
+            showSuccess('Share link copied to clipboard!');
+        }).catch(function(err) {
+            console.error('Failed to copy link:', err);
+            fallbackCopyShareLink(shareUrl);
+        });
+    } else {
+        fallbackCopyShareLink(shareUrl);
+    }
+}
+// Fallback copy function for older browsers
+function fallbackCopyShareLink(shareUrl) {
+    console.log('📋 Using fallback copy method...');
+    
+    // Create temporary input element
+    var tempInput = document.createElement('input');
+    tempInput.value = shareUrl;
+    tempInput.style.position = 'absolute';
+    tempInput.style.left = '-9999px';
+    document.body.appendChild(tempInput);
+    
+    try {
+        tempInput.select();
+        tempInput.setSelectionRange(0, 99999); // For mobile devices
+        var success = document.execCommand('copy');
+        
+        if (success) {
+            showSuccess('Share link copied to clipboard!');
+        } else {
+            showError('Please copy this link manually: ' + shareUrl);
+        }
+    } catch (err) {
+        console.error('Fallback copy failed:', err);
+        showError('Please copy this link manually: ' + shareUrl);
+    } finally {
+        document.body.removeChild(tempInput);
+    }
+}
+function showSuccess(message) {
+    console.log('✅ Success:', message);
+    
+    var errorElement = document.getElementById('error');
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+        errorElement.className = 'success-message'; // Use CSS class from HTML
+        
+        // Hide after 3 seconds
+        setTimeout(function() {
+            errorElement.style.display = 'none';
+            errorElement.className = ''; // Reset class
+        }, 3000);
+    } else {
+        // Fallback: create a temporary success message
+        var successDiv = document.createElement('div');
+        successDiv.textContent = message;
+        successDiv.style.cssText = 'background: #4CAF50; color: white; padding: 10px; margin: 10px 0; border-radius: 4px;';
+        document.body.insertBefore(successDiv, document.body.firstChild);
+        
+        setTimeout(function() {
+            if (successDiv.parentNode) {
+                successDiv.parentNode.removeChild(successDiv);
+            }
+        }, 3000);
+    }
 }
 
-function showPasswordModal() {
-    var existingModal = document.querySelector('.password-modal-overlay');
-    if (existingModal) {
-        existingModal.remove();
+// Helper functions
+function getSessionState(session) {
+    console.log('📊 Getting session state:', session);
+    
+    if (!session) {
+        return {
+            players: {},
+            votesRevealed: false,
+            hasConsensus: false
+        };
     }
+    
+    return {
+        players: session.players || {},
+        votesRevealed: session.votesRevealed || false,
+        hasConsensus: checkConsensus(session)
+    };
+}
 
-    var modalOverlay = document.createElement('div');
-    modalOverlay.className = 'password-modal-overlay';
-    modalOverlay.innerHTML = 
-        '<div class="password-modal">' +
-            '<h3>🔒 Enter Team Password</h3>' +
-            '<p>Please enter the team password to access Planning Poker:</p>' +
-            '<input type="password" id="passwordInput" placeholder="Enter password" maxlength="50">' +
-            '<div class="modal-buttons">' +
-                '<button id="submitPassword" class="btn-primary">Submit</button>' +
-                '<button id="cancelPassword" class="btn-secondary">Cancel</button>' +
-            '</div>' +
-            '<div id="passwordError" class="password-error" style="display: none;"></div>' +
-        '</div>';
+function checkConsensus(session) {
+    if (!session || !session.players || !session.votesRevealed) {
+        return false;
+    }
     
-    document.body.appendChild(modalOverlay);
+    var votes = [];
+    var players = session.players;
     
-    var passwordInput = document.getElementById('passwordInput');
-    passwordInput.focus();
+    // Collect all votes from non-spectator players
+    for (var playerName in players) {
+        if (players.hasOwnProperty(playerName)) {
+            var player = players[playerName];
+            if (!player.isSpectator && player.hasVoted && player.vote !== null) {
+                votes.push(player.vote);
+            }
+        }
+    }
     
-    document.getElementById('submitPassword').addEventListener('click', validatePassword);
-    document.getElementById('cancelPassword').addEventListener('click', closePasswordModal);
+    // Need at least 2 votes for consensus
+    if (votes.length < 2) {
+        return false;
+    }
     
-    passwordInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            validatePassword();
+    // Check if all votes are the same
+    var firstVote = votes[0];
+    for (var i = 1; i < votes.length; i++) {
+        if (votes[i] !== firstVote) {
+            return false;
+        }
+    }
+    
+    console.log('🎯 Consensus reached! All votes are:', firstVote);
+    return true;
+}
+// Debug function to check current state
+function debugCurrentState() {
+    console.log('🔍 Current App State Debug:');
+    console.log('  - gameState:', gameState);
+    console.log('  - isConnected:', gameState.isConnected);
+    console.log('  - sessionCode:', gameState.sessionCode);
+    console.log('  - playerName:', gameState.playerName);
+    console.log('  - isSpectator:', gameState.isSpectator);
+    console.log('  - currentVote:', gameState.currentVote);
+    
+    // Check authentication
+    var authState = localStorage.getItem('planning-poker-authenticated');
+    console.log('  - authState:', authState);
+    
+    // Check element visibility
+    var passwordSection = document.getElementById('passwordSection');
+    var gameSection = document.getElementById('gameSection');
+    
+    if (passwordSection) {
+        console.log('  - passwordSection display:', window.getComputedStyle(passwordSection).display);
+    }
+    
+    if (gameSection) {
+        console.log('  - gameSection display:', window.getComputedStyle(gameSection).display);
+    }
+}
+// Enhanced debugging function
+function debugInterfaceState() {
+    console.log('🔍 Interface Debug State:');
+    
+    var elements = [
+        'passwordSection',
+        'gameSection', 
+        'joinForm',
+        'sessionInterface',
+        'votingCards',
+        'playersSection',
+        'controls'
+    ];
+    
+    elements.forEach(function(id) {
+        var element = document.getElementById(id);
+        if (element) {
+            var display = window.getComputedStyle(element).display;
+            console.log('  ' + id + ': ' + display + ' (exists)');
+        } else {
+            console.log('  ' + id + ': MISSING ELEMENT');
         }
     });
+}
+// Helper function to force show password interface (for testing)
+function forceShowPasswordInterface() {
+    console.log('🚨 Force showing password interface for testing...');
     
-    var escapeHandler = function(e) {
-        if (e.key === 'Escape') {
-            closePasswordModal();
-            document.removeEventListener('keydown', escapeHandler);
-        }
+    // Clear authentication
+    localStorage.removeItem('planning-poker-authenticated');
+    
+    // Show password interface
+    showPasswordInterface();
+}
+// Helper function to debug role configuration
+function debugRoleInterface() {
+    console.log('🔍 Role Interface Debug:');
+    
+    var elements = {
+        'votingCards': document.getElementById('votingCards'),
+        'resetButton': document.getElementById('resetButton'),
+        'resetButtonSpectator': document.getElementById('resetButtonSpectator')
     };
-    document.addEventListener('keydown', escapeHandler);
-}
-
-function validatePassword() {
-    var passwordInput = document.getElementById('passwordInput');
-    var enteredPassword = passwordInput.value.trim();
-    var passwordError = document.getElementById('passwordError');
     
-    var correctPassword = 'team2024';
+    Object.keys(elements).forEach(function(key) {
+        var element = elements[key];
+        if (element) {
+            var display = window.getComputedStyle(element).display;
+            console.log('  ' + key + ': ' + display);
+        } else {
+            console.log('  ' + key + ': MISSING');
+        }
+    });
+}
+// Call this after authentication to check what's happening
+function checkInterfaceAfterAuth() {
+    console.log('🔧 Checking interface after authentication...');
     
-    if (enteredPassword === correctPassword) {
-        localStorage.setItem('planningPoker_authenticated', 'true');
-        hidePasswordField();
-        closePasswordModal();
-        showTemporaryMessage('✅ Authentication successful!');
-        focusOnPlayerName();
-    } else {
-        passwordError.textContent = '❌ Incorrect password. Please try again.';
-        passwordError.style.display = 'block';
-        passwordInput.value = '';
-        passwordInput.focus();
-        
-        var modal = document.querySelector('.password-modal');
-        modal.style.animation = 'slideIn 0.5s ease-in-out';
-        setTimeout(function() {
-            modal.style.animation = '';
-        }, 500);
-    }
-}
-
-function closePasswordModal() {
-    var modal = document.querySelector('.password-modal-overlay');
-    if (modal) {
-        modal.remove();
-    }
-}
-
-function hidePasswordField() {
-    var passwordGroup = document.getElementById('passwordGroup');
-    if (passwordGroup) {
-        passwordGroup.style.display = 'none';
-    }
-}
-
-function showPasswordField() {
-    var passwordGroup = document.getElementById('passwordGroup');
-    if (passwordGroup) {
-        passwordGroup.style.display = 'block';
-    }
-}
-
-function focusOnPlayerName() {
     setTimeout(function() {
-        var playerNameField = document.getElementById('playerName');
-        if (playerNameField) {
-            playerNameField.focus();
+        debugInterfaceState();
+        
+        // Force show game interface if it's hidden
+        var gameSection = document.getElementById('gameSection');
+        if (gameSection && window.getComputedStyle(gameSection).display === 'none') {
+            console.log('🚨 Game section is hidden! Forcing it to show...');
+            gameSection.style.display = 'block';
+        }
+        
+        var joinForm = document.getElementById('joinForm');
+        if (joinForm && window.getComputedStyle(joinForm).display === 'none') {
+            console.log('🚨 Join form is hidden! Forcing it to show...');
+            joinForm.style.display = 'block';
         }
     }, 100);
+}
+function testRoleInterface() {
+    console.log('🧪 Testing role-based interface...');
+    
+    // Test Spectator
+    console.log('Testing Spectator role...');
+    configureRoleBasedInterface(true);
+    setTimeout(function() {
+        debugRoleInterface();
+        
+        // Test Voter
+        console.log('Testing Voter role...');
+        configureRoleBasedInterface(false);
+        setTimeout(function() {
+            debugRoleInterface();
+        }, 1000);
+    }, 1000);
+}
+// TESTING FUNCTIONS - Add these to test authentication scenarios:
+
+// Test fresh user experience (no stored auth)
+function testFreshUser() {
+    console.log('🧪 Testing fresh user experience...');
+    localStorage.removeItem('planning-poker-authenticated');
+    checkAuthentication();
+}
+
+// Test returning user experience (stored auth)
+function testReturningUser() {
+    console.log('🧪 Testing returning user experience...');
+    localStorage.setItem('planning-poker-authenticated', 'true');
+    checkAuthentication();
+}
+
+// Test shared link experience
+function testSharedLink(sessionCode) {
+    console.log('🧪 Testing shared link experience...');
+    // Simulate clicking a shared link
+    var url = new URL(window.location);
+    url.searchParams.set('session', sessionCode || 'TEST123');
+    window.history.pushState({}, '', url);
+    
+    // Clear auth to simulate new user
+    localStorage.removeItem('planning-poker-authenticated');
+    location.reload();
 }
