@@ -414,7 +414,7 @@ jobs:
     needs: [e2e-tests, build, security-scan, cost-optimization]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     #environment:
-    #  name: production
+    #  name: productio
     
     steps:
     - uses: actions/checkout@v4
