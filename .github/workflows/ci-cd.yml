@@ -352,14 +352,14 @@ jobs:
         path: planning-poker-${{ github.sha }}.tar.gz
         retention-days: 30
 
-  # Job 8: Deploy to Staging (Serverless)
+# Job 8: Deploy to Staging (Fixed Authentication)
   deploy-staging:
     name: Deploy to Staging (Serverless)
     runs-on: ubuntu-latest
     needs: [e2e-tests, build, security-scan, cost-optimization]
     if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
     #environment:
-      #name: staging
+    #  name: staging
     
     steps:
     - uses: actions/checkout@v4
@@ -376,9 +376,9 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-1
     
-    - name: Install Serverless Framework
+    - name: Install Serverless Framework v3 (No Auth Required)
       run: |
-        npm install -g serverless
+        npm install -g serverless@3
         serverless --version
     
     - name: Deploy Serverless to Staging
@@ -387,32 +387,34 @@ jobs:
         tar -xzf planning-poker-${{ github.sha }}.tar.gz
         cd deployment-package
         
-        # Install production dependencies
-        npm ci --only=production
+        # Install production dependencies (suppress warnings)
+        npm ci --omit=dev --silent
         
-        # Deploy to staging
+        # Deploy to staging using v3 (no authentication required)
         serverless deploy --stage staging --region us-east-1
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     
     - name: Deploy static files to S3
       run: |
-        # Upload client files to S3 staging bucket
+        # Upload client files to S3 staging bucket (optional)
         aws s3 sync deployment-package/public s3://planning-poker-staging-static --delete || echo "S3 bucket not configured"
     
     - name: Run staging smoke tests
       run: |
         # Wait for deployment to be ready
         sleep 30
-        
-        # Test basic functionality
         echo "Staging deployment completed successfully"
 
-  # Job 9: Deploy to Production (Serverless)
+  # Job 9: Deploy to Production (Fixed Authentication)
   deploy-production:
     name: Deploy to Production (Serverless)
     runs-on: ubuntu-latest
     needs: [e2e-tests, build, security-scan, cost-optimization]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    #environment: production
+    #environment:
+    #  name: production
     
     steps:
     - uses: actions/checkout@v4
@@ -429,9 +431,9 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-1
     
-    - name: Install Serverless Framework
+    - name: Install Serverless Framework v3 (No Auth Required)
       run: |
-        npm install -g serverless
+        npm install -g serverless@3
         serverless --version
     
     - name: Deploy Serverless to Production
@@ -440,22 +442,24 @@ jobs:
         tar -xzf planning-poker-${{ github.sha }}.tar.gz
         cd deployment-package
         
-        # Install production dependencies
-        npm ci --only=production
+        # Install production dependencies (suppress warnings)
+        npm ci --omit=dev --silent
         
-        # Deploy to production
+        # Deploy to production using v3 (no authentication required)
         serverless deploy --stage production --region us-east-1
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     
     - name: Deploy static files to S3
       run: |
-        # Upload client files to S3 production bucket
+        # Upload client files to S3 production bucket (optional)
         aws s3 sync deployment-package/public s3://planning-poker-production-static --delete || echo "S3 bucket not configured"
     
     - name: Run production smoke tests
       run: |
         # Wait for deployment to be ready
         sleep 60
-        
         echo "Production deployment completed successfully"
     
     - name: Notify deployment success
