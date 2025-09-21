@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "concurrently \"npm run client:dev\" \"npm run server:dev\"",
     "client:dev": "cd client && npm run dev",
-    "server:dev": "node serverless/local-server.js",
+    "client:build": "cd client && npm run build",
+    "serverless:dev": "node serverless/local-server.js",
     "offline": "serverless offline start --host 0.0.0.0 --httpPort 3001",
     "build": "cd client && npm run build",
+    "start": "node serverless/local-server.js",
     "deploy": "serverless deploy --stage prod",
     "deploy:dev": "serverless deploy --stage dev",
     "remove": "serverless remove",
@@ -22,7 +24,10 @@
     "test:watch": "jest --watch --testPathPattern=\"tests/unit|server/tests\"",
     "test:debug": "DEBUG=true jest --testPathPattern=\"tests/unit|server/tests\" --verbose",
     "cost:monitor": "aws ce get-cost-and-usage --time-period Start=$(date -d '1 month ago' +%Y-%m-01),End=$(date +%Y-%m-%d) --granularity MONTHLY --metrics BlendedCost",
-    "cost:alarm": "aws cloudwatch put-metric-alarm --alarm-name PlanningPokerCost --alarm-description 'Alert when costs exceed $5' --metric-name EstimatedCharges --namespace AWS/Billing --statistic Maximum --period 86400 --threshold 5 --comparison-operator GreaterThanThreshold --evaluation-periods 1 --dimensions Name=Currency,Value=USD"
+    "cost:alarm": "aws cloudwatch put-metric-alarm --alarm-name PlanningPokerCost --alarm-description 'Alert when costs exceed $5' --metric-name EstimatedCharges --namespace AWS/Billing --statistic Maximum --period 86400 --threshold 5 --comparison-operator GreaterThanThreshold --evaluation-periods 1 --dimensions Name=Currency,Value=USD",
+    "serverless:deploy": "serverless deploy",
+    "serverless:remove": "serverless remove",
+    "deploy:build": "npm run build && npm run serverless:deploy"  
   },
   "keywords": [
     "serverless",
@@ -51,6 +56,7 @@
     "dotenv": "^17.2.2",
     "express": "^4.18.2",
     "socket.io": "^4.7.5",
-    "update": "^0.7.4"
+    "update": "^0.7.4",
+    "serverless": "^3.0.0"
   }
 }

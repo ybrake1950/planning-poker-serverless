@@ -50,7 +50,8 @@ jobs:
         npx prettier --check "**/*.{js,json,md}"
       continue-on-error: true
 
-  # Job 2: Unit Tests
+
+# Job 2: Unit Tests (Fixed for Serverless Structure)
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -68,12 +69,12 @@ jobs:
     - name: Install dependencies
       run: |
         npm ci
-        cd server && npm ci && cd ..
         cd client && npm ci && cd ..
+        # Note: No server subdirectory for serverless architecture
     
     - name: Run unit tests
       run: |
-        npm run test -- --coverage --testPathPattern="tests/unit|server/tests" --passWithNoTests
+        npm run test:unit -- --coverage --passWithNoTests
       env:
         NODE_ENV: test
     
@@ -223,7 +224,7 @@ jobs:
         if [ ! -z "$CLIENT_PID" ]; then
           kill $CLIENT_PID || true
         fi
-        
+
   # Job 5: Security Scan
   security-scan:
     name: Security Scan
@@ -306,6 +307,7 @@ jobs:
         path: cost-analysis.md
 
   # Job 7: Build and Package
+    # Job 7: Build and Package (Fixed for Serverless Structure)
   build:
     name: Build Application
     runs-on: ubuntu-latest
@@ -323,8 +325,8 @@ jobs:
     - name: Install dependencies
       run: |
         npm ci
-        cd server && npm ci && cd ..
         cd client && npm ci && cd ..
+        # Note: No server subdirectory for serverless architecture
     
     - name: Build client application
       run: |
@@ -334,16 +336,18 @@ jobs:
       run: |
         mkdir -p deployment-package
         
-        # Copy server files
-        cp -r server/src deployment-package/
-        cp server/package.json deployment-package/
-        cp server/package-lock.json deployment-package/ || true
+        # Copy serverless functions (not server/src)
+        cp -r serverless deployment-package/
+        cp serverless.yml deployment-package/
+        cp package.json deployment-package/
+        cp package-lock.json deployment-package/ || true
         
-        # Copy built client files
-        cp -r client/dist deployment-package/public
+        # Copy built client files to public directory
+        mkdir -p deployment-package/public
+        cp -r client/dist/* deployment-package/public/ || cp -r client/build/* deployment-package/public/
         
-        # Copy deployment scripts
-        cp -r deployment deployment-package/ || true
+        # Copy deployment scripts if they exist
+        cp -r deployment deployment-package/ || echo "No deployment directory found"
         
         # Create archive
         tar -czf planning-poker-${{ github.sha }}.tar.gz deployment-package/
