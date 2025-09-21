@@ -4,7 +4,7 @@
   "description": "Serverless Planning Poker voting application",
   "main": "serverless/local-server.js",
   "scripts": {
-    "dev": "concurrently \"node serverless/local-server.js\" \"cd client && npm run dev\"",
+    "dev": "concurrently \"npm run client:dev\" \"npm run server:dev\"",
     "client:dev": "cd client && npm run dev",
     "client:build": "cd client && npm run build",
     "serverless:dev": "node serverless/local-server.js",
