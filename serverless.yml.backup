@@ -76,15 +76,14 @@ functions:
       - websocket:
           route: resetVotes
 
-
-  # HTTP API handlers  
+  # HTTP API handlers
   createSession:
     handler: serverless/api.createSession
     events:
       - httpApi:
           path: /api/sessions
           method: post
-          
+
   getSession:
     handler: serverless/api.getSession
     events:
@@ -110,20 +109,30 @@ functions:
       - httpApi:
           path: /{proxy+}
           method: get
+  # HTTP API handlers  
+  createSession:
+    handler: serverless/api.createSession
+    events:
+      - httpApi:
+          path: /api/sessions
+          method: post
+          
+  getSession:
+    handler: serverless/api.getSession
+    events:
+      - httpApi:
+          path: /api/sessions/{code}
+          method: get
+      - httpApi:
+          path: /{proxy+}
+          method: get
 
-custom:
-  customDomain:
-    domainName: team2playscards.com
-    stage: prod
-    basePath: ''
-    certificateRegion: us-east-1
-    createRoute53Record: true
-    endpointType: regional
-
-plugins:
-  - serverless-offline
-
-resources:
+      - httpApi:
+          path: /{proxy+}
+          method: get          
+      - httpApi:
+          path: /{proxy+}
+          method: get
   Resources:
     SessionsTable:
       Type: AWS::DynamoDB::Table
@@ -172,3 +181,4 @@ package:
     - tests/**
     - .git/**
     - README.md
+
