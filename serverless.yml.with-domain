@@ -99,9 +99,17 @@ functions:
           method: get
 
 custom:
+  customDomain:
+    domainName: team2playscards.com
+    stage: prod
+    basePath: ''
+    certificateRegion: us-east-1
+    createRoute53Record: true
+    endpointType: regional
 
 plugins:
   - serverless-offline
+  - serverless-domain-manager
 
 resources:
   Resources:

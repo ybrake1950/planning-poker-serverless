@@ -102,6 +102,7 @@ custom:
 
 plugins:
   - serverless-offline
+  - serverless-domain-manager
 
 resources:
   Resources:

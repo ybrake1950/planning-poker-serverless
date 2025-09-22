@@ -1,0 +1,67 @@
+service: planning-poker-serverless
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  
+  environment:
+    NODE_ENV: production
+    CORS_ORIGIN: https://team2playscards.com
+
+  httpApi:
+    cors:
+      allowedOrigins:
+        - https://team2playscards.com
+        - http://localhost:8080
+      allowedHeaders:
+        - Content-Type
+        - Authorization
+      allowedMethods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+
+functions:
+  api:
+    handler: serverless/index.handler
+    timeout: 30
+    memorySize: 256
+    events:
+      - httpApi:
+          path: /api/health
+          method: get
+      - httpApi:
+          path: /api/sessions
+          method: post
+      - httpApi:
+          path: /api/sessions/{code}
+          method: get
+      - httpApi:
+          path: /{proxy+}
+          method: any
+
+custom:
+  customDomain:
+    domainName: team2playscards.com
+    stage: prod
+    basePath: ''
+    certificateRegion: us-east-1
+    createRoute53Record: true
+    endpointType: regional
+
+plugins:
+  - serverless-offline
+  - serverless-domain-manager
+
+package:
+  individually: false
+  exclude:
+    - client/node_modules/**
+    - client/src/**
+    - tests/**
+    - .git/**
+    - README.md
