@@ -46,7 +46,7 @@
     "puppeteer": "^24.22.0",
     "serverless": "^3.38.0",
     "serverless-domain-manager": "^7.4.0",
-    "serverless-offline": "^13.9.0",
+    "serverless-offline": "^13.8.0",
     "socket.io-client": "^4.8.1",
     "supertest": "^6.3.4"
   },
