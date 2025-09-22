@@ -388,7 +388,7 @@ jobs:
         cd deployment-package
         
         # Install production dependencies (suppress warnings)
-        npm ci --omit=dev --silent
+        npm ci --silent
         
         # Deploy to staging using v3 (no authentication required)
         serverless deploy --stage dev --region us-east-1
@@ -443,7 +443,7 @@ jobs:
         cd deployment-package
         
         # Install production dependencies (suppress warnings)
-        npm ci --omit=dev --silent
+        npm ci --silent
         
         # Deploy to production using v3 (no authentication required)
         serverless deploy --stage prod --region us-east-1
