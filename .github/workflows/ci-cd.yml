@@ -391,7 +391,7 @@ jobs:
         npm ci --omit=dev --silent
         
         # Deploy to staging using v3 (no authentication required)
-        serverless deploy --stage staging --region us-east-1
+        serverless deploy --stage dev --region us-east-1
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -446,7 +446,7 @@ jobs:
         npm ci --omit=dev --silent
         
         # Deploy to production using v3 (no authentication required)
-        serverless deploy --stage production --region us-east-1
+        serverless deploy --stage prod --region us-east-1
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
