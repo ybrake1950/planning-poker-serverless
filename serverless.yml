@@ -11,7 +11,7 @@ provider:
     CORS_ORIGIN: https://team2playscards.com
     SESSIONS_TABLE: ${self:service}-sessions-${self:provider.stage}
     CONNECTIONS_TABLE: ${self:service}-connections-${self:provider.stage}
-
+    FRONTEND_URL: https://team2playscards.com
   iamRoleStatements:
     - Effect: Allow
       Action:
