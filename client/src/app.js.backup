@@ -391,7 +391,7 @@ function connectToServer() {
     
     var serverUrl;
     if (isLocal) {
-        serverUrl = 'https://f204vbala1.execute-api.us-east-1.amazonaws.com/prod';
+        serverUrl = 'http://localhost:3001';
         console.log('🏠 Using local development server:', serverUrl);
     } else {
         serverUrl = window.location.origin;
