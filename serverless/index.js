@@ -34,7 +34,7 @@ app.use(cors({
 app.use(express.json());
 
 // Password Protection Configuration
-var TEAM_PASSWORD = process.env.TEAM_PASSWORD || 'team2024';
+var TEAM_PASSWORD = process.env.TEAM_PASSWORD || 'Prime';
 console.log('🔒 Password protection enabled. Team password set.');
 
 // In-memory session storage

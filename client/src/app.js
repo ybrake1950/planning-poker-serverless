@@ -394,7 +394,7 @@ function connectToServer() {
         serverUrl = 'http://localhost:3001';
         console.log('🏠 Using local development server:', serverUrl);
     } else {
-        serverUrl = window.location.origin;
+        serverUrl = "https://eo6hf7a1wj.execute-api.us-east-1.amazonaws.com/prod";
         console.log('☁️ Using production server:', serverUrl);
     }
     
