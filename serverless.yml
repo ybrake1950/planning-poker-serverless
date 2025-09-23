@@ -1,53 +1,16 @@
-# serverless.yml
-# AWS Serverless configuration for Planning Poker WebSocket application
-# Directory: planning-poker/serverless.yml
-
 service: planning-poker-websocket
 
 provider:
   name: aws
   runtime: nodejs18.x
   region: us-east-1
-  stage: ${opt:stage, 'prod'}
+  stage: ${opt:stage, 'dev'}
   
-  # Environment variables for Lambda functions
   environment:
     SESSIONS_TABLE: ${self:service}-sessions-${self:provider.stage}
     CONNECTIONS_TABLE: ${self:service}-connections-${self:provider.stage}
-    WEBSOCKET_API_ENDPOINT: 
-      Fn::Join:
-        - ''
-        - - 'https://'
-          - Ref: WebsocketsApi
-          - '.execute-api.'
-          - ${self:provider.region}
-          - '.amazonaws.com/'
-          - ${self:provider.stage}
-  
-  # IAM permissions for Lambda functions to access DynamoDB and API Gateway
-  iamRoleStatements:
-    - Effect: Allow
-      Action:
-        - dynamodb:Query
-        - dynamodb:Scan
-        - dynamodb:GetItem
-        - dynamodb:PutItem
-        - dynamodb:UpdateItem
-        - dynamodb:DeleteItem
-      Resource:
-        - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.SESSIONS_TABLE}"
-        - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.CONNECTIONS_TABLE}"
-        - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.SESSIONS_TABLE}/index/*"
-        - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.CONNECTIONS_TABLE}/index/*"
-    - Effect: Allow
-      Action:
-        - execute-api:ManageConnections
-      Resource:
-        - "arn:aws:execute-api:*:*:**/@connections/*"
 
-# Lambda Functions
 functions:
-  # WebSocket connection lifecycle handlers
   websocketConnect:
     handler: serverless/websocket-handler.connect
     events:
@@ -58,13 +21,11 @@ functions:
     events:
       - websocket: $disconnect
       
-  # WebSocket message routing handler
   websocketMessage:
     handler: serverless/websocket-handler.message
     events:
       - websocket: $default
 
-  # HTTP API endpoints (for session management)
   createSession:
     handler: serverless/http-handler.createSession
     events:
@@ -89,94 +50,11 @@ functions:
           method: get
           cors: true
 
-# AWS Resources (DynamoDB tables)
-resources:
-  Resources:
-    # Sessions table - stores game session data
-    SessionsTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:provider.environment.SESSIONS_TABLE}
-        AttributeDefinitions:
-          - AttributeName: sessionCode
-            AttributeType: S
-        KeySchema:
-          - AttributeName: sessionCode
-            KeyType: HASH
-        BillingMode: PAY_PER_REQUEST  # Cost-effective for variable workloads
-        TimeToLiveSpecification:
-          AttributeName: expiresAt
-          Enabled: true  # Automatic cleanup of expired sessions
-          
-    # Connections table - tracks active WebSocket connections
-    ConnectionsTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:provider.environment.CONNECTIONS_TABLE}
-        AttributeDefinitions:
-          - AttributeName: connectionId
-            AttributeType: S
-          - AttributeName: sessionCode
-            AttributeType: S
-        KeySchema:
-          - AttributeName: connectionId
-            KeyType: HASH
-        GlobalSecondaryIndexes:
-          - IndexName: SessionIndex
-            KeySchema:
-              - AttributeName: sessionCode
-                KeyType: HASH
-            Projection:
-              ProjectionType: ALL
-        BillingMode: PAY_PER_REQUEST
-        TimeToLiveSpecification:
-          AttributeName: expiresAt
-          Enabled: true  # Automatic cleanup of stale connections
-
-  # Outputs for easy reference
-  Outputs:
-    WebSocketApiUrl:
-      Description: "WebSocket API Gateway URL"
-      Value:
-        Fn::Join:
-          - ''
-          - - 'wss://'
-            - Ref: WebsocketsApi
-            - '.execute-api.'
-            - ${self:provider.region}
-            - '.amazonaws.com/'
-            - ${self:provider.stage}
-    
-    HttpApiUrl:
-      Description: "HTTP API Gateway URL"
-      Value:
-        Fn::Join:
-          - ''
-          - - 'https://'
-            - Ref: ApiGatewayRestApi
-            - '.execute-api.'
-            - ${self:provider.region}
-            - '.amazonaws.com/'
-            - ${self:provider.stage}
-
-# Serverless plugins for development and deployment
 plugins:
   - serverless-offline
-  - serverless-dynamodb-local
 
-# Plugin configuration
 custom:
-  # Local development settings
   serverless-offline:
-    port: 3001
+    httpPort: 3001
     websocketPort: 3001
-    
-  # Local DynamoDB settings
-  dynamodb:
-    start:
-      port: 8000
-      inMemory: true
-      migrate: true
-    stages:
-      - dev
-      - local
+    lambdaPort: 3003
