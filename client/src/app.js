@@ -79,3 +79,26 @@ function generateSessionCode() {
     }
     return result;
 }
+
+function handleWebSocketMessage(data) {
+    try {
+        var message = JSON.parse(data);
+        console.log('Parsed message:', message);
+        
+        if (message.type === 'sessionJoined' || message.action === 'sessionJoined') {
+            console.log('Successfully joined session!');
+            
+            // Hide join form and show game interface
+            document.getElementById('joinForm').style.display = 'none';
+            document.getElementById('sessionInterface').style.display = 'block';
+            
+            // Update session info
+            document.getElementById('currentSessionCode').textContent = message.sessionCode || 'Unknown';
+            document.getElementById('currentPlayerName').textContent = message.playerName || 'Unknown';
+            
+            console.log('Transitioned to game session interface');
+        }
+    } catch (error) {
+        console.error('Error handling message:', error);
+    }
+}
