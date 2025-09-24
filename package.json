@@ -18,7 +18,7 @@
     "test": "jest --testPathPattern=\"tests/unit|server/tests\"",
     "test:unit": "jest --testPathPattern=\"tests/unit|server/tests\" --coverage",
     "test:integration": "jest --testPathPattern=\"tests/integration\" --testTimeout=15000",
-    "test:cost": "jest --testPathPattern=\"tests/cost-optimization\" --testTimeout=15000",
+    "test:cost": "jest tests/cost-optimization --testTimeout=15000",
     "test:e2e": "jest --testPathPattern=\"tests/e2e\" --testTimeout=45000",
     "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e && npm run test:cost",
     "test:watch": "jest --watch --testPathPattern=\"tests/unit|server/tests\"",
