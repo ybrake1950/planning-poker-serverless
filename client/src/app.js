@@ -14,8 +14,31 @@ document.addEventListener('DOMContentLoaded', function() {
     
     document.getElementById('joinButton').addEventListener('click', function() {
         console.log('Join button clicked');
+        
+        var playerName = document.getElementById('playerName').value.trim();
+        var sessionCode = document.getElementById('sessionCode').value.trim().toUpperCase();
+        var isSpectator = document.getElementById('isSpectator').checked;
+        
+        if (!playerName) {
+            console.error('Player name is required');
+            return;
+        }
+        
+        if (!sessionCode) {
+            sessionCode = generateSessionCode();
+        }
+        
         if (gameState.isConnected) {
-            console.log('WebSocket is connected and ready!');
+            console.log('Sending join session message...');
+            var message = {
+                action: 'joinSession',
+                sessionCode: sessionCode,
+                playerName: playerName,
+                isSpectator: isSpectator
+            };
+            
+            gameState.websocket.send(JSON.stringify(message));
+            console.log('Sent:', message);
         } else {
             console.log('WebSocket not connected yet');
         }
@@ -46,4 +69,13 @@ function updateConnectionStatus(status) {
         statusElement.textContent = status === 'connected' ? 'Connected' : 'Disconnected';
         statusElement.className = status === 'connected' ? 'status-connected' : 'status-disconnected';
     }
+}
+
+function generateSessionCode() {
+    var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    var result = "";
+    for (var i = 0; i < 6; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
 }
