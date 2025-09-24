@@ -81,24 +81,42 @@ function generateSessionCode() {
 }
 
 function handleWebSocketMessage(data) {
+    console.log('Raw response from backend:', data);
+    
     try {
         var message = JSON.parse(data);
-        console.log('Parsed message:', message);
+        console.log('Parsed backend message:', message);
         
-        if (message.type === 'sessionJoined' || message.action === 'sessionJoined') {
-            console.log('Successfully joined session!');
+        if (message.type === 'sessionJoined' || 
+            message.action === 'sessionJoined' || 
+            message.status === 'success' ||
+            message.message === 'joined' ||
+            (message.sessionCode && message.playerName)) {
             
-            // Hide join form and show game interface
+            console.log('Session join detected - transitioning to game interface');
+            
+            var joinForm = document.getElementById('joinForm');
+            var sessionInterface = document.getElementById('sessionInterface');
+            
+            if (joinForm && sessionInterface) {
+                joinForm.style.display = 'none';
+                sessionInterface.style.display = 'block';
+                console.log('Interface transition completed');
+                
+                var sessionCode = message.sessionCode || document.getElementById('sessionCode').value || 'UNKNOWN';
+                var playerName = message.playerName || document.getElementById('playerName').value || 'Player';
+                
+                document.getElementById('currentSessionCode').textContent = sessionCode;
+                document.getElementById('currentPlayerName').textContent = playerName;
+            }
+        } else {
+            console.log('Response did not match expected format - forcing transition');
             document.getElementById('joinForm').style.display = 'none';
             document.getElementById('sessionInterface').style.display = 'block';
-            
-            // Update session info
-            document.getElementById('currentSessionCode').textContent = message.sessionCode || 'Unknown';
-            document.getElementById('currentPlayerName').textContent = message.playerName || 'Unknown';
-            
-            console.log('Transitioned to game session interface');
         }
     } catch (error) {
-        console.error('Error handling message:', error);
+        console.error('Error parsing response:', error);
+        document.getElementById('joinForm').style.display = 'none';
+        document.getElementById('sessionInterface').style.display = 'block';
     }
 }
